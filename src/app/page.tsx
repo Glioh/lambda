@@ -1,10 +1,11 @@
+import { prisma } from "@/lib/db";
 import {Button} from "@/components/ui/button";
 
 const Page = () => {
-return <div>  
-  <Button variant="destructive">
-    Click me
-  </Button>
+
+return 
+<div>  
+  HELLO WORLD
 </div>}
 
 export default Page;
