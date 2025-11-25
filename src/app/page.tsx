@@ -1,18 +1,20 @@
-"use client";
+import { getQueryClient, trpc } from "@/trpc/server";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+import { Client } from "./client";
+import { Suspense } from "react";
 
-import { prisma } from "@/lib/db";
-import {Button} from "@/components/ui/button";
-import { useTRPC } from "@/trpc/client";
-import { useQuery } from "@tanstack/react-query";
+const Page = async () => {
+  const queryClient = getQueryClient();
+  // imp: needs to be void as prefetchquery populates data only in the client component
+  void queryClient.prefetchQuery(trpc.createAI.queryOptions({text: "MICHAEL PREFETCH"}))
 
-const Page = () => {
-  const trpc = useTRPC();
-  const { data } = useQuery(trpc.createAI.queryOptions({ text: "Michael"}));
-
+  
   return (
-  <div>  
-    {JSON.stringify(data)}
-  </div>
+  <HydrationBoundary state={dehydrate(queryClient)}>
+    <Suspense fallback={<p>loading...</p>}>
+      <Client />
+    </Suspense>
+  </HydrationBoundary>
   );
 }
 
