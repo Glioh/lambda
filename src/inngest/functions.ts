@@ -36,7 +36,10 @@ export const helloWorld = inngest.createFunction(
             command: z.string(),
           }),
           handler: async ({ command }, { step }) => {
-            return await step?.run("terminal", async () => {
+            if (!step) {
+              throw new Error("Step context is required for terminal tool");
+            }
+            return await step.run("terminal", async () => {
               const buffers = { stdout: "", stderr: ""};
 
               try {
