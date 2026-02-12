@@ -42,15 +42,22 @@ export const projectsRouter = createTRPCRouter({
                         }
                     }
                 },
-            })
-
-            await inngest.send({
-                name: 'code-agent/run',
-                data: { 
-                    value: input.value,
-                    projectId: createdProject.id
-                },
             });
+
+            try {
+                await inngest.send({
+                    name: 'code-agent/run',
+                    data: { 
+                        value: input.value,
+                        projectId: createdProject.id
+                    },
+                });
+            } catch (error) {
+                await prisma.project.delete({
+                    where: { id: createdProject.id },
+                });
+                throw error;
+            }
 
             return createdProject;
         }),

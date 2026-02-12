@@ -1,12 +1,3 @@
-/*
-  Warnings:
-
-  - Added the required column `projectId` to the `Message` table without a default value. This is not possible if the table is not empty.
-
-*/
--- AlterTable
-ALTER TABLE "Message" ADD COLUMN     "projectId" TEXT NOT NULL;
-
 -- CreateTable
 CREATE TABLE "Project" (
     "id" TEXT NOT NULL,
@@ -16,6 +7,20 @@ CREATE TABLE "Project" (
 
     CONSTRAINT "Project_pkey" PRIMARY KEY ("id")
 );
+
+-- Step 1: Add projectId as nullable
+ALTER TABLE "Message" ADD COLUMN "projectId" TEXT;
+
+-- Step 2: Backfill existing rows with a default project
+INSERT INTO "Project" ("id", "name", "createdAt", "updatedAt")
+SELECT 'default-project', 'Default Project', NOW(), NOW()
+WHERE EXISTS (SELECT 1 FROM "Message" WHERE "projectId" IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM "Project" WHERE "id" = 'default-project');
+
+UPDATE "Message" SET "projectId" = 'default-project' WHERE "projectId" IS NULL;
+
+-- Step 3: Set the column to NOT NULL
+ALTER TABLE "Message" ALTER COLUMN "projectId" SET NOT NULL;
 
 -- AddForeignKey
 ALTER TABLE "Message" ADD CONSTRAINT "Message_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
