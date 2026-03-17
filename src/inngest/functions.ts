@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 
 interface AgentState {
   summary: string;
-  files: { [path: string]: string};
+  files: { [path: string]: string };
 }
 
 export const codeAgentFunction = inngest.createFunction(
@@ -46,7 +46,7 @@ export const codeAgentFunction = inngest.createFunction(
               throw new Error("Step context is required for terminal tool");
             }
             return await step.run("terminal", async () => {
-              const buffers = { stdout: "", stderr: ""};
+              const buffers = { stdout: "", stderr: "" };
 
               try {
                 const sandbox = await getSandbox(sandboxId);
@@ -77,7 +77,7 @@ export const codeAgentFunction = inngest.createFunction(
             files: z.array(
               z.object({
                 path: z.string(),
-                content: z.string() 
+                content: z.string()
               }),
             ),
           }),
@@ -112,7 +112,7 @@ export const codeAgentFunction = inngest.createFunction(
           parameters: z.object({
             files: z.array(z.string()),
           }),
-          handler: async ({files}, {step}) => {
+          handler: async ({ files }, { step }) => {
             return await step?.run("readFiles", async () => {
               try {
                 const sandbox = await getSandbox(sandboxId);
@@ -141,7 +141,7 @@ export const codeAgentFunction = inngest.createFunction(
             }
           }
           return result;
-        }, 
+        },
       }
     });
 
@@ -177,7 +177,7 @@ export const codeAgentFunction = inngest.createFunction(
             projectId: event.data.projectId,
             content: "Something went wrong. Please try again.",
             role: "ASSISTANT",
-            type: "RESULT",
+            type: "ERROR",
           },
         });
       }
@@ -195,12 +195,12 @@ export const codeAgentFunction = inngest.createFunction(
               files: result.state.data.files,
 
             }
-          } 
+          }
         }
       })
     });
 
-    return { 
+    return {
       url: sandboxUrl,
       title: "Fragment",
       files: result.state.data.files,
