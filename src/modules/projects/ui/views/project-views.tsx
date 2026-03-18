@@ -2,8 +2,6 @@
 
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { useTRPC } from "@/trpc/client";
-import { HydrationBoundary, useSuspenseQuery } from "@tanstack/react-query";
-import { string } from "zod";
 import { MessagesContainer } from "../components/messages-container";
 import { Suspense } from "react";
 
