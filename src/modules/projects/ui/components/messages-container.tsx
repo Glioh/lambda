@@ -1,6 +1,5 @@
 import { useTRPC } from "@/trpc/client";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { stringify } from "querystring";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
 import { useEffect, useRef } from "react";
