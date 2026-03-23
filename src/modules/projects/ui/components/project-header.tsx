@@ -20,13 +20,13 @@ export const ProjectHeader = ({ projectId }: Props) => {
     const { setTheme, theme } = useTheme();
 
     return (
-        <header className="p-2 flex justify-between items-center border-bottom">
+        <header className="p-2 flex justify-between items-center border-b">
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
                         variant="ghost"
                         size="sm"
-                        className="focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity pl-2!"
+                        className="focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity !pl-2"
                     >
                         <Image src="/logo.svg" alt="Lambda Logo" width={18} height={18} />
                         <span className="text-sm font-medium">{project.name}</span>
@@ -45,7 +45,7 @@ export const ProjectHeader = ({ projectId }: Props) => {
                     <DropdownMenuSeparator />
                     <DropdownMenuSub>
                         <DropdownMenuSubTrigger className="gap-2">
-                            <SunMoonIcon className="size-4 text-muted foreground" />
+                            <SunMoonIcon className="size-4 text-muted-foreground" />
                             <span>Appearance</span>
                         </DropdownMenuSubTrigger>
                         <DropdownMenuPortal>
