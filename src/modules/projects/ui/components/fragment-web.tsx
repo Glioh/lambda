@@ -17,15 +17,20 @@ export function FragmentWeb({ data }: Props) {
     }
 
     const handleCopy = () => {
-        navigator.clipboard.writeText(data.sandboxUrl);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        navigator.clipboard.writeText(data.sandboxUrl)
+            .then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            })
+            .catch((err) => {
+                console.error("Failed to copy URL:", err);
+            });
     }
 
 
     return (
         <div className="flex flex-col w-full h-full">
-            <div className="p-2 border-bottom bg-sidebar flex items-center gap-x-2">
+            <div className="p-2 border-b bg-sidebar flex items-center gap-x-2">
                 <Hint text="Refresh" side="bottom" align="start">
                     <Button
                         size="sm"
@@ -62,13 +67,19 @@ export function FragmentWeb({ data }: Props) {
                     </Button>
                 </Hint>
             </div>
-            <iframe
-                key={fragmentKey}
-                className="h-full w-full"
-                sandbox="allow-forms allow-scripts allow-same-origin"
-                loading="lazy"
-                src={data.sandboxUrl}
-            />
+            {data.sandboxUrl ? (
+                <iframe
+                    key={fragmentKey}
+                    className="h-full w-full"
+                    sandbox="allow-forms allow-scripts allow-same-origin"
+                    loading="lazy"
+                    src={data.sandboxUrl}
+                />
+            ) : (
+                <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
+                    No preview available
+                </div>
+            )}
         </div>
     );
 }
