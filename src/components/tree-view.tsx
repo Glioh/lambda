@@ -49,7 +49,7 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
     const currentPath = parentPath ? `${parentPath}/${name}` : name;
 
     if (!items.length) {
-        // ITS A FILE
+        // SINGLE ITEM IS A FILE
         const isSelected = selectedValue === currentPath;;
 
         return (

@@ -10,7 +10,6 @@ import { Breadcrumb, BreadcrumbEllipsis, BreadcrumbItem, BreadcrumbList, Breadcr
 
 type FileCollection = { [path: string]: string };
 
-// returns .tsx from app.tsx
 function getLanguageFromExtension(filename: string): string {
 	const extension = filename.split(".").pop()?.toLowerCase();
 	return extension || "text";
@@ -100,22 +99,11 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
 	}, [files]);
 
 	const handleFileSelect = useCallback((filePath: string) => {
-		console.log({ filePath })
 		if (files[filePath]) {
 			setSelectedFile(filePath);
 		}
 	}, [files]);
 
-	// const handleCopy = () => {
-	//     navigator.clipboard.writeText(files[selectedFile]);
-	//         .then(() => {
-	//             setCopied(true);
-	//             setTimeout(() => setCopied(false), 2000);
-	//         })
-	//         .catch((err) => {
-	//             console.error("Failed to copy URL:", err);
-	//         });
-	// }
 	const handleCopy = useCallback(() => {
 		if (selectedFile) {
 			navigator.clipboard.writeText(files[selectedFile]);
@@ -162,7 +150,7 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
 					</div>
 				) : (
 					<div className="flex h-full items-center justify-center text-muted-foreground">
-						Select a file to view it&apos;s content
+						Select a file to view its content
 					</div>
 				)}
 			</ResizablePanel>

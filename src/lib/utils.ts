@@ -22,13 +22,20 @@ export function convertFilesToTreeItems(
 
 
 ): TreeItem[] {
+  const safeFiles: { [path: string]: string } =
+    files && typeof files === "object" && !Array.isArray(files)
+      ? Object.fromEntries(
+        Object.entries(files).filter(([, value]) => typeof value === "string"),
+      )
+      : {};
+
   interface TreeNode {
     [key: string]: TreeNode | null;
   };
 
   const tree: TreeNode = {};
 
-  const sortedPaths = Object.keys(files).sort();
+  const sortedPaths = Object.keys(safeFiles).sort();
 
   for (const filePath of sortedPaths) {
     const parts = filePath.split("/");
@@ -36,10 +43,11 @@ export function convertFilesToTreeItems(
 
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];
-      if (!current[part]) {
+      const next = current[part];
+      if (!next || typeof next !== "object") {
         current[part] = {};
       }
-      current = current[part];
+      current = current[part] as TreeNode;
     }
 
     const fileName = parts[parts.length - 1];
