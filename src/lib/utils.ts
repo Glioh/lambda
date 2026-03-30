@@ -57,7 +57,7 @@ export function convertFilesToTreeItems(
   function convertNode(node: TreeNode, name?: string): TreeItem[] | TreeItem {
     const entries = Object.entries(node);
     if (entries.length === 0) {
-      return name || "";
+      return name ?? [];
     }
 
     const children: TreeItem[] = [];

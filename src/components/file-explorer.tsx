@@ -99,13 +99,13 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
 	}, [files]);
 
 	const handleFileSelect = useCallback((filePath: string) => {
-		if (files[filePath]) {
+		if (filePath in files) {
 			setSelectedFile(filePath);
 		}
 	}, [files]);
 
 	const handleCopy = useCallback(() => {
-		if (selectedFile) {
+		if (selectedFile && selectedFile in files) {
 			navigator.clipboard.writeText(files[selectedFile]);
 			setCopied(true);
 			setTimeout(() => {
@@ -125,7 +125,7 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
 			</ResizablePanel>
 			<ResizableHandle className="hover:bg-primary transition-colors" />
 			<ResizablePanel defaultSize={70} minSize={50}>
-				{selectedFile && files[selectedFile] ? (
+				{selectedFile && selectedFile in files ? (
 					<div className="h-full w-full flex flex-col">
 						<div className="border-b bg-sidebar px-4 py-2 flex justify-between items-center gap-x-2">
 							<FileBreadcrumb filePath={selectedFile} />
