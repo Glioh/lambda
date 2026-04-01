@@ -31,7 +31,6 @@ export const TreeView = ({ data, value, onSelect }: TreeViewProps) => {
                         </SidebarGroupContent>
                     </SidebarGroup>
                 </SidebarContent>
-                <SidebarRail />
             </Sidebar>
         </SidebarProvider>
     )
