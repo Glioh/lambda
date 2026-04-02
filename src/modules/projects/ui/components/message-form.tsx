@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 interface Props {
     projectId: string;
+    onSendStart?: () => void;
 };
 
 const formSchema = z.object({ // <- this is a zod schema that defines the shape of our form data and includes validation rules
@@ -21,7 +22,7 @@ const formSchema = z.object({ // <- this is a zod schema that defines the shape 
         .max(10000, "Prompt is too long"),
 });
 
-export const MessageForm = ({ projectId }: Props) => {
+export const MessageForm = ({ projectId, onSendStart }: Props) => {
 
     const trpc = useTRPC();
     const queryClient = useQueryClient();
@@ -48,6 +49,7 @@ export const MessageForm = ({ projectId }: Props) => {
     }));
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        onSendStart?.();
         await createMessage.mutateAsync({
             value: values.value,
             projectId,

@@ -18,8 +18,25 @@ interface Props {
 };
 
 export const ProjectView = ({ projectId }: Props) => {
-	const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
+	const [autoActiveFragment, setAutoActiveFragment] = useState<Fragment | null>(null);
+	const [userActiveFragment, setUserActiveFragment] = useState<Fragment | null>(null);
+	const activeFragment = userActiveFragment ?? autoActiveFragment;
+
 	const [tabState, setTabState] = useState<"preview" | "code">("preview");
+
+	const handleUserSelectFragment = (fragment: Fragment | null) => {
+		setUserActiveFragment(fragment);
+	};
+
+	const handleAutoSelectFragment = (fragment: Fragment | null) => {
+		setAutoActiveFragment(fragment);
+		setUserActiveFragment(null);
+	};
+
+	const handleUserMessageSendStart = () => {
+		setAutoActiveFragment(null);
+		setUserActiveFragment(null);
+	};
 
 	const trpc = useTRPC();
 
@@ -38,11 +55,13 @@ export const ProjectView = ({ projectId }: Props) => {
 						<MessagesContainer
 							projectId={projectId}
 							activeFragment={activeFragment}
-							setActiveFragment={setActiveFragment}
+							onUserSelectFragment={handleUserSelectFragment}
+							onAutoSelectFragment={handleAutoSelectFragment}
+							onUserMessageSendStart={handleUserMessageSendStart}
 						/>
 					</Suspense>
 				</ResizablePanel>
-				<ResizableHandle withHandle />
+				<ResizableHandle className="hover:bg-primary transition-colors" />
 				<ResizablePanel
 					defaultSize={65}
 					minSize={50}
