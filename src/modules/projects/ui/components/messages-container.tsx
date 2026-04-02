@@ -63,7 +63,7 @@ export const MessagesContainer = ({
                             role={message.role}
                             fragment={message.fragment}
                             createdAt={message.createdAt}
-                            isActiveFragment={activeFragment?.id === message.fragment?.id}
+                            isActiveFragment={!!activeFragment && !!message.fragment && activeFragment.id === message.fragment.id}
                             onFragmentClick={() => onUserSelectFragment(message.fragment)}
                             type={message.type}
                         />
