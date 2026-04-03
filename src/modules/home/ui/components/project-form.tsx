@@ -54,8 +54,8 @@ export const ProjectForm = () => {
 		}),
 	);
 
-	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		await createProject.mutateAsync({
+	const onSubmit = (values: z.infer<typeof formSchema>) => {
+		createProject.mutate({
 			value: values.value,
 		});
 	};
