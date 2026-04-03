@@ -45,6 +45,7 @@ export const ProjectForm = () => {
 			onError: (error) => {
 				if (error.data?.code === "UNAUTHORIZED") {
 					router.push("/sign-in");
+					return;
 				}
 
 				//TODO redirect to pricing page if specific error
