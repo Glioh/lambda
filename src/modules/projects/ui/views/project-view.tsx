@@ -1,6 +1,10 @@
-"use client"
+"use client";
 
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import {
+	ResizableHandle,
+	ResizablePanel,
+	ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { useTRPC } from "@/trpc/client";
 import { MessagesContainer } from "../components/messages-container";
 import { Suspense, useState } from "react";
@@ -12,14 +16,19 @@ import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { FileExplorer } from "@/components/file-explorer";
+import { UserControl } from "@/components/user-control";
 
 interface Props {
 	projectId: string;
-};
+}
 
 export const ProjectView = ({ projectId }: Props) => {
-	const [autoActiveFragment, setAutoActiveFragment] = useState<Fragment | null>(null);
-	const [userActiveFragment, setUserActiveFragment] = useState<Fragment | null>(null);
+	const [autoActiveFragment, setAutoActiveFragment] = useState<Fragment | null>(
+		null,
+	);
+	const [userActiveFragment, setUserActiveFragment] = useState<Fragment | null>(
+		null,
+	);
 	const activeFragment = userActiveFragment ?? autoActiveFragment;
 
 	const [tabState, setTabState] = useState<"preview" | "code">("preview");
@@ -88,6 +97,7 @@ export const ProjectView = ({ projectId }: Props) => {
 										<CrownIcon /> Upgrade
 									</Link>
 								</Button>
+								<UserControl />
 							</div>
 						</div>
 						<TabsContent value="preview">
@@ -103,6 +113,6 @@ export const ProjectView = ({ projectId }: Props) => {
 					</Tabs>
 				</ResizablePanel>
 			</ResizablePanelGroup>
-		</div >
-	)
+		</div>
+	);
 };
