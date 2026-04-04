@@ -27,7 +27,7 @@ export const Usage = ({ points, msBeforeNext }: Props) => {
 								start: new Date(),
 								end: new Date(Date.now() + msBeforeNext),
 							}),
-							{ format: ["months", "days", "hours"] },
+							{ format: ["months", "days", "hours", "minutes"] },
 						)}
 					</p>
 				</div>
