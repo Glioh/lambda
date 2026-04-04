@@ -1,6 +1,10 @@
 import { inngest } from "@/inngest/client";
 import { prisma } from "@/lib/db";
-import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import {
+	protectedProcedure,
+	createTRPCRouter,
+	usageProtectedProcedure,
+} from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
@@ -29,7 +33,7 @@ export const messagesRouter = createTRPCRouter({
 			return messages;
 		}),
 
-	create: protectedProcedure
+	create: usageProtectedProcedure
 		.input(
 			z.object({
 				value: z
