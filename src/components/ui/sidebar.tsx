@@ -38,7 +38,7 @@ type SidebarContextProps = {
 	setOpen: (open: boolean) => void;
 	openMobile: boolean;
 	setOpenMobile: (open: boolean) => void;
-	isMobile: boolean;
+	isMobile: boolean | undefined;
 	toggleSidebar: () => void;
 };
 
@@ -90,6 +90,9 @@ function SidebarProvider({
 
 	// Helper to toggle the sidebar.
 	const toggleSidebar = React.useCallback(() => {
+		if (isMobile === undefined) {
+			return;
+		}
 		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
 	}, [isMobile, setOpen, setOpenMobile]);
 
@@ -178,6 +181,10 @@ function Sidebar({
 				{children}
 			</div>
 		);
+	}
+
+	if (isMobile === undefined) {
+		return null;
 	}
 
 	if (isMobile) {
