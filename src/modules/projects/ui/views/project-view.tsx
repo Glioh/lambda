@@ -5,7 +5,6 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { useTRPC } from "@/trpc/client";
 import { MessagesContainer } from "../components/messages-container";
 import { Suspense, useState } from "react";
 import { Fragment } from "@/generated/prisma/browser";
@@ -49,7 +48,6 @@ export const ProjectView = ({ projectId }: Props) => {
 		setUserActiveFragment(null);
 	};
 
-	const trpc = useTRPC();
 	const { has, isLoaded } = useAuth();
 	const hasProAccess = isLoaded ? has?.({ plan: "pro" }) : undefined;
 

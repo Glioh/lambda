@@ -11,7 +11,6 @@ import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Usage } from "./usage";
-import { RateLimiterPrisma } from "rate-limiter-flexible";
 import { useRouter } from "next/navigation";
 
 interface Props {
