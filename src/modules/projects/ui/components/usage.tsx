@@ -3,7 +3,7 @@ import { useAuth } from "@clerk/nextjs";
 import { formatDuration, intervalToDuration } from "date-fns";
 import { CrownIcon } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Props {
 	points: number;
@@ -13,21 +13,40 @@ interface Props {
 export const Usage = ({ points, msBeforeNext }: Props) => {
 	const { has } = useAuth();
 	const hasProAccess = has?.({ plan: "pro" });
+	const [remainingMs, setRemainingMs] = useState(0);
+
+	useEffect(() => {
+		const safeMsBeforeNext = Number.isFinite(msBeforeNext)
+			? Math.max(0, msBeforeNext)
+			: 0;
+		const resetAt = Date.now() + safeMsBeforeNext;
+
+		const updateRemaining = () => {
+			setRemainingMs(Math.max(0, resetAt - Date.now()));
+		};
+
+		updateRemaining();
+		const interval = setInterval(updateRemaining, 60_000);
+
+		return () => clearInterval(interval);
+	}, [msBeforeNext]);
 
 	const resetTime = useMemo(() => {
 		try {
-			return formatDuration(
+			const formatted = formatDuration(
 				intervalToDuration({
-					start: new Date(),
-					end: new Date(Date.now() + msBeforeNext),
+					start: 0,
+					end: remainingMs,
 				}),
 				{ format: ["months", "days", "hours", "minutes"] },
 			);
+
+			return formatted || "< 1 minute";
 		} catch (error) {
 			console.error("Error formatting duration", error);
 			return "unknown";
 		}
-	}, [msBeforeNext]);
+	}, [remainingMs]);
 
 	return (
 		<div className="rounded-t-xl bg-background border border-b-0 p-2.5">
