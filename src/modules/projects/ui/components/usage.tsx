@@ -13,6 +13,8 @@ interface Props {
 export const Usage = ({ points, msBeforeNext }: Props) => {
 	const { has } = useAuth();
 	const hasProAccess = has?.({ plan: "pro" });
+	const creditLabel = points === 1 ? "message" : "messages";
+	const tierLabel = hasProAccess ? "" : "free ";
 	const [remainingMs, setRemainingMs] = useState(0);
 
 	useEffect(() => {
@@ -53,7 +55,8 @@ export const Usage = ({ points, msBeforeNext }: Props) => {
 			<div className="flex items-center gap-x-2">
 				<div>
 					<p className="text-sm">
-						{points} {hasProAccess ? "" : "free"} credits remaining
+						{points} {tierLabel}
+						{creditLabel} remaining
 					</p>
 					<p className="text-xs text-muted-foreground">Resets in {resetTime}</p>
 				</div>
