@@ -14,12 +14,10 @@ import {
 	lastAssistantTextMessageContent,
 	parseAgentOutput,
 } from "./utils";
-import { get } from "http";
 import z from "zod";
-import { on } from "events";
-import { buffer } from "stream/consumers";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 import { prisma } from "@/lib/db";
+import { SANDBOX_TIMEOUT } from "./types";
 
 interface AgentState {
 	summary: string;
@@ -32,6 +30,7 @@ export const codeAgentFunction = inngest.createFunction(
 	async ({ event, step }) => {
 		const sandboxId = await step.run("get-sandbox-id", async () => {
 			const sandbox = await Sandbox.create("lambda");
+			await sandbox.setTimeout(SANDBOX_TIMEOUT);
 			return sandbox.sandboxId;
 		});
 
@@ -45,8 +44,9 @@ export const codeAgentFunction = inngest.createFunction(
 						projectId: event.data.projectId,
 					},
 					orderBy: {
-						createdAt: "asc",
+						createdAt: "desc",
 					},
+					take: 5,
 				});
 
 				for (const message of messages) {
@@ -57,7 +57,7 @@ export const codeAgentFunction = inngest.createFunction(
 					});
 				}
 
-				return formattedMessages;
+				return formattedMessages.reverse(); // Reverse to have the most recent messages first
 			},
 		);
 
