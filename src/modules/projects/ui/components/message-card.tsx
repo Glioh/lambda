@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
-import { Fragment } from "@/generated/prisma/client";
-import { MessageRole, MessageType } from "@/generated/prisma/enums";
+import type { Fragment } from "@prisma/client";
+import { MessageRole, MessageType } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ChevronRightIcon, Code2Icon } from "lucide-react";
@@ -18,7 +18,7 @@ const UserMessage = ({ content }: UserMessageProps) => {
 			</Card>
 		</div>
 	);
-}
+};
 
 interface FragmentCardProps {
 	fragment: Fragment;
@@ -37,7 +37,7 @@ const FragmentCard = ({
 				"flex items-start text-start gap-2 border rounded-lg bg-muted w-fit p-3 hover:bg-secondary",
 				"transition-colors",
 				isActiveFragment &&
-				"bg-primary text-primary-foreground border-primary hover:bg-primary",
+					"bg-primary text-primary-foreground border-primary hover:bg-primary",
 			)}
 			onClick={() => onFragmentClick(fragment)}
 		>
@@ -51,9 +51,8 @@ const FragmentCard = ({
 			<div className="flex items-center justify-center mt-0.5">
 				<ChevronRightIcon className="size-4" />
 			</div>
-
 		</button>
-	)
+	);
 };
 
 interface AssistantMessageProps {
@@ -74,10 +73,12 @@ const AssistantMessage = ({
 	type,
 }: AssistantMessageProps) => {
 	return (
-		<div className={cn(
-			"flex flex-col group px-2 pb-4",
-			type === "ERROR" && "text-red-700 dark:text-red-500",
-		)}>
+		<div
+			className={cn(
+				"flex flex-col group px-2 pb-4",
+				type === "ERROR" && "text-red-700 dark:text-red-500",
+			)}
+		>
 			<div className="flex items-center gap-2 pl-2 mb-2">
 				<Image
 					src="/logo.svg"
@@ -102,8 +103,8 @@ const AssistantMessage = ({
 				)}
 			</div>
 		</div>
-	)
-}
+	);
+};
 
 interface MessageCardProps {
 	content: string;
@@ -134,12 +135,8 @@ export const MessageCard = ({
 				onFragmentClick={onFragmentClick}
 				type={type}
 			/>
-		)
+		);
 	}
 
-	return (
-		<UserMessage
-			content={content}
-		/>
-	);
+	return <UserMessage content={content} />;
 };
