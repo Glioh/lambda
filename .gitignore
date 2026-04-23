@@ -41,3 +41,13 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Ignore all shell scripts
+*.sh
+
+# Ignore all markdown files
+*.md
+
+# Ignore specific files
+prd.json
+progress.txt
