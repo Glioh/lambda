@@ -47,6 +47,8 @@ next-env.d.ts
 
 # Ignore all markdown files
 *.md
+# Track task/audit docs
+!tasks/*.md
 
 # Ignore specific files
 prd.json
