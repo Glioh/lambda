@@ -8,7 +8,8 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint .",
-    "test:routing": "node --import tsx --test src/modules/routing/__tests__/router.test.ts"
+    "test:routing": "node --import tsx --test src/modules/routing/__tests__/router.test.ts src/modules/routing/__tests__/state.test.ts",
+    "test:routing-state": "node --import tsx --test src/modules/routing/__tests__/state.test.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.0.8",

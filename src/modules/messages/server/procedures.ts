@@ -1,4 +1,3 @@
-import { inngest } from "@/inngest/client";
 import { prisma } from "@/lib/db";
 import {
 	protectedProcedure,
@@ -6,6 +5,7 @@ import {
 	usageProtectedProcedure,
 } from "@/trpc/init";
 import { decideRoute, routingInputSchema } from "@/modules/routing";
+import { logAuditEvent } from "@/modules/routing/audit";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
@@ -75,19 +75,31 @@ export const messagesRouter = createTRPCRouter({
 				projectId: existingProject.id,
 			});
 
-			if (decision.decision === "chat" || decision.requiresConfirmation) {
+			if (decision.decision === "chat") {
 				// TODO(P5-2): split chat budget — credits currently consumed via usageProtectedProcedure even on chat path
-				return { ...newMessage, routing: decision };
+				return { ...newMessage, routing: decision, pendingRunId: null };
 			}
 
-			await inngest.send({
-				name: "code-agent/run",
-				data: {
-					value: input.value,
-					projectId: existingProject.id,
-				},
-			});
+			if (decision.requiresConfirmation) {
+				const pendingRun = await prisma.pendingRun.create({
+					data: {
+						status: "waiting_confirmation",
+						draftValue: input.value,
+						projectId: existingProject.id,
+						messageId: newMessage.id,
+					},
+				});
 
-			return { ...newMessage, routing: decision };
+				await logAuditEvent(prisma, {
+					pendingRunId: pendingRun.id,
+					action: "create",
+					actor: ctx.auth.userId,
+					payload: { decision },
+				});
+
+				return { ...newMessage, routing: decision, pendingRunId: pendingRun.id };
+			}
+
+			return { ...newMessage, routing: decision, pendingRunId: null };
 		}),
 });
