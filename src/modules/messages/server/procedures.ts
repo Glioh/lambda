@@ -5,7 +5,7 @@ import {
 	createTRPCRouter,
 	usageProtectedProcedure,
 } from "@/trpc/init";
-import { routingInputSchema } from "@/modules/routing";
+import { decideRoute, routingInputSchema } from "@/modules/routing";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
@@ -69,6 +69,17 @@ export const messagesRouter = createTRPCRouter({
 				},
 			});
 
+			const decision = decideRoute({
+				value: input.value,
+				routing: input.routing,
+				projectId: existingProject.id,
+			});
+
+			if (decision.decision === "chat" || decision.requiresConfirmation) {
+				// TODO(P5-2): split chat budget — credits currently consumed via usageProtectedProcedure even on chat path
+				return { ...newMessage, routing: decision };
+			}
+
 			await inngest.send({
 				name: "code-agent/run",
 				data: {
@@ -77,6 +88,6 @@ export const messagesRouter = createTRPCRouter({
 				},
 			});
 
-			return newMessage;
+			return { ...newMessage, routing: decision };
 		}),
 });
