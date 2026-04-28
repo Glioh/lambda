@@ -1,14 +1,8 @@
 import { createHash } from "node:crypto";
-import { ROUTING_RULES } from "./config";
-import { isExplicitChatIntent, isStructuredBuildIntent } from "./rules";
+import { ROUTING_RULES, isStructuredBuildIntent } from "./rules";
 import type { RoutingDecision, RoutingInput } from "./types";
 
-type RuleHit =
-	| "explicit_build"
-	| "explicit_chat"
-	| "structured_build"
-	| "explicit_chat_marker"
-	| "fallback";
+type RuleHit = "explicit_build" | "structured_build" | "fallback";
 
 interface DecideRouteInput {
 	value: string;
@@ -30,30 +24,12 @@ export function decideRoute(
 		});
 	}
 
-	if (input.routing?.mode === "chat") {
-		return logAndReturn(input, logger, "explicit_chat", {
-			decision: "chat",
-			decisionSource: "explicit",
-			confidence: "high",
-			requiresConfirmation: false,
-		});
-	}
-
 	if (isStructuredBuildIntent(input.value, ROUTING_RULES)) {
 		return logAndReturn(input, logger, "structured_build", {
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "high",
 			requiresConfirmation: true,
-		});
-	}
-
-	if (isExplicitChatIntent(input.value, ROUTING_RULES)) {
-		return logAndReturn(input, logger, "explicit_chat_marker", {
-			decision: "chat",
-			decisionSource: "auto",
-			confidence: "high",
-			requiresConfirmation: false,
 		});
 	}
 

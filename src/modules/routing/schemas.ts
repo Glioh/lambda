@@ -4,7 +4,7 @@ export const modeSchema = z.enum(["chat", "build"]);
 
 export const routingInputSchema = z
 	.object({
-		mode: modeSchema.optional(),
+		mode: z.literal("build").optional(),
 		draftForExecution: z.string().optional(),
 	})
 	.optional();

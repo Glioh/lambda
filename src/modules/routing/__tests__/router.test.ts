@@ -17,33 +17,12 @@ describe("decideRoute", () => {
 		);
 	});
 
-	it("routes explicit chat with high confidence and no confirmation", () => {
-		assert.deepEqual(
-			decideRoute({ value: "build a landing page", routing: { mode: "chat" } }, logger),
-			{
-				decision: "chat",
-				decisionSource: "explicit",
-				confidence: "high",
-				requiresConfirmation: false,
-			},
-		);
-	});
-
 	it("routes structured build intent to build with confirmation", () => {
 		assert.deepEqual(decideRoute({ value: "build a landing page for my SaaS" }, logger), {
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "high",
 			requiresConfirmation: true,
-		});
-	});
-
-	it("routes explicit chat intent to chat", () => {
-		assert.deepEqual(decideRoute({ value: "what is React?" }, logger), {
-			decision: "chat",
-			decisionSource: "auto",
-			confidence: "high",
-			requiresConfirmation: false,
 		});
 	});
 

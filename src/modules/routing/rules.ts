@@ -1,7 +1,17 @@
-import type { ROUTING_RULES } from "./config";
+export interface RoutingRules {
+	structuredBuildPatterns: RegExp[];
+	fencedJsonSpecPattern: RegExp;
+}
 
-const QUESTION_WORD_PATTERN =
-	/^(who|what|when|where|why|how|can|could|would|should|is|are|do|does|did)\b/i;
+export const ROUTING_RULES: RoutingRules = {
+	structuredBuildPatterns: [
+		/\bbuild\s+(a|me|the)\s+(website|app|landing|dashboard|saas|tool|page|site)\b/i,
+		/\bcreate\s+a\s+(next|react|vite|nextjs)\s+(app|project)\b/i,
+		/\bgenerate\s+(an?|the)\s+(app|website|landing|dashboard)\b/i,
+	],
+	fencedJsonSpecPattern:
+		/```json\s*[\s\S]*\b(spec|requirements)\b[\s\S]*```/i,
+};
 
 export function isStructuredBuildIntent(
 	value: string,
@@ -11,26 +21,4 @@ export function isStructuredBuildIntent(
 		rules.structuredBuildPatterns.some((pattern) => pattern.test(value)) ||
 		rules.fencedJsonSpecPattern.test(value)
 	);
-}
-
-export function isExplicitChatIntent(
-	value: string,
-	rules: typeof ROUTING_RULES,
-): boolean {
-	const trimmedValue = value.trim();
-	const normalizedValue = trimmedValue.toLowerCase();
-
-	return rules.explicitChatMarkers.some((marker) => {
-		const normalizedMarker = marker.toLowerCase();
-
-		if (normalizedMarker === "starts-with-question-word") {
-			return QUESTION_WORD_PATTERN.test(trimmedValue);
-		}
-
-		if (normalizedMarker === "?") {
-			return normalizedValue.includes("?");
-		}
-
-		return normalizedValue.startsWith(normalizedMarker);
-	});
 }
