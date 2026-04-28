@@ -6,6 +6,7 @@ import {
 	createTRPCRouter,
 	usageProtectedProcedure,
 } from "@/trpc/init";
+import { routingInputSchema } from "@/modules/routing";
 import z from "zod";
 import { TRPCError } from "@trpc/server";
 
@@ -53,6 +54,7 @@ export const projectsRouter = createTRPCRouter({
 					.string()
 					.min(1, { message: "Message cannot be empty." })
 					.max(10000, "Prompt is too long"),
+				routing: routingInputSchema,
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
