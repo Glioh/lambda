@@ -197,18 +197,20 @@ User Input
 
 **Implementation Tasks**
 1. Implement rule-first checks:
-   - Explicit build intent -> build candidate.
-   - Explicit chat intent -> chat.
+   - Explicit build intent (mode override from dropdown) -> build candidate.
+   - ~~Explicit chat intent -> chat.~~ *(removed — no chat toggle exists in UI)*
 2. Implement high-confidence structured intent detection.
-3. Default ambiguous cases to chat.
+3. Default ambiguous cases to chat (fallback, low confidence).
 4. Optional model adjudication only in ambiguous middle band.
 5. Enforce hard policy: expensive workflows cannot auto-execute without confirmation.
 6. Emit routing decision logs with reason and confidence.
 
+**Design decision**: Explicit chat mode removed. `RoutingInput.mode` narrowed to `"build"` only. `config.ts` deleted; rule constants live in `rules.ts` alongside matching functions.
+
 **Deliverables**
-- Routing service module.
+- Routing service module (`router.ts`, `rules.ts`).
 - Router decision schema.
-- Configurable thresholds.
+- Rule constants in `rules.ts` (append new patterns there).
 
 **Dependencies**: P1-1
 
@@ -220,8 +222,7 @@ User Input
 **Validation**
 - Test matrix of prompts:
   - explicit build
-  - explicit chat
-  - ambiguous
+  - ambiguous (fallback chat)
   - high-confidence structured build
 
 ---

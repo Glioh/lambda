@@ -4,7 +4,7 @@ export type Mode = "chat" | "build";
 
 // ─── Router Input ───────────────────────────────────────────────────
 export interface RoutingInput {
-	mode?: Mode;
+	mode?: "build";
 	draftForExecution?: string;
 }
 

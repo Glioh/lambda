@@ -1,24 +1,10 @@
 import type { RoutingDecision, RoutingInput } from "./types";
+import { decideRoute } from "./router";
 
 /**
  * Build a routing decision from input.
- * When routing input is absent, defaults to build mode (current behavior)
- * to maintain backward compatibility.
  */
 export function resolveRoutingDecision(input?: RoutingInput): RoutingDecision {
-	if (!input?.mode) {
-		return {
-			decision: "build",
-			decisionSource: "auto",
-			confidence: "low",
-			requiresConfirmation: false,
-		};
-	}
-
-	return {
-		decision: input.mode,
-		decisionSource: "explicit",
-		confidence: "high",
-		requiresConfirmation: input.mode === "build",
-	};
+	// Empty string is intentional for routing-only validation paths.
+	return decideRoute({ value: "", routing: input });
 }
