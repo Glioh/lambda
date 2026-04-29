@@ -266,6 +266,8 @@ User Input
 ### Ticket P2-1: Synchronous Chat Pipeline with Streaming
 **Outcome**: Chat responses are fast, streaming, and independent of worker queue.
 
+**Status**: ✅ Done (Issue #25)
+
 **Scope**
 - Build new synchronous chat path used when router decides chat.
 
@@ -650,4 +652,3 @@ User Input
 - Artifacts are canonical in dedicated storage with immutable versioning.
 - Observability and budget controls are active.
 - Rollout is flaggable and reversible.
-

@@ -16,6 +16,10 @@ import { useRouter } from "next/navigation";
 interface Props {
 	projectId: string;
 	onSendStart?: () => void;
+	onChatStreamStart?: () => void;
+	onChatStreamToken?: (token: string) => void;
+	onChatStreamEnd?: () => void;
+	onChatStreamError?: (message: string) => void;
 }
 
 const formSchema = z.object({
@@ -26,7 +30,19 @@ const formSchema = z.object({
 		.max(10000, "Prompt is too long"),
 });
 
-export const MessageForm = ({ projectId, onSendStart }: Props) => {
+/**
+ * Renders the message composer and streams chat responses back into the UI.
+ * @param {Props} props - The message form props.
+ * @returns {JSX.Element} The rendered message composer.
+ */
+export const MessageForm = ({
+	projectId,
+	onSendStart,
+	onChatStreamStart,
+	onChatStreamToken,
+	onChatStreamEnd,
+	onChatStreamError,
+}: Props) => {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
@@ -42,12 +58,28 @@ export const MessageForm = ({ projectId, onSendStart }: Props) => {
 
 	const createMessage = useMutation(
 		trpc.messages.create.mutationOptions({
-			onSuccess: () => {
+			onSuccess: async (message, variables) => {
 				form.reset();
-				queryClient.invalidateQueries(
+				await queryClient.invalidateQueries(
 					trpc.messages.getMany.queryOptions({ projectId }),
 				);
 				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+
+				if (message.routing.decision !== "chat") {
+					return;
+				}
+
+				try {
+					await streamChatResponse(variables.value);
+				} catch (error) {
+					const message =
+						error instanceof Error
+							? error.message
+							: "Something went wrong. Please try again.";
+
+					onChatStreamError?.(message);
+					toast.error(message);
+				}
 			},
 			onError: (error) => {
 				toast.error(error.message);
@@ -59,6 +91,84 @@ export const MessageForm = ({ projectId, onSendStart }: Props) => {
 		}),
 	);
 
+	/**
+	 * Starts the chat stream and forwards incoming tokens to the parent.
+	 * @param {string} value - The submitted user prompt.
+	 * @returns {Promise<void>} A promise that resolves when streaming ends.
+	 */
+	const streamChatResponse = async (value: string) => {
+		onChatStreamStart?.();
+
+		const response = await fetch("/api/chat", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ value, projectId }),
+		});
+
+		if (!response.ok || !response.body) {
+			throw new Error("Unable to start chat response.");
+		}
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		while (true) {
+			const { value: chunk, done } = await reader.read();
+
+			if (done) {
+				break;
+			}
+
+			buffer += decoder.decode(chunk, { stream: true });
+			const events = buffer.split("\n\n");
+			buffer = events.pop() ?? "";
+
+			for (const event of events) {
+				const lines = event.split("\n");
+				const eventName =
+					lines
+						.find((line) => line.startsWith("event: "))
+						?.slice("event: ".length) ?? "message";
+				const data = lines
+					.find((line) => line.startsWith("data: "))
+					?.slice("data: ".length);
+
+				if (!data) {
+					continue;
+				}
+
+				if (data === "[DONE]") {
+					await queryClient.invalidateQueries(
+						trpc.messages.getMany.queryOptions({ projectId }),
+					);
+					onChatStreamEnd?.();
+					return;
+				}
+
+				const parsed = JSON.parse(data) as { token?: string; error?: string };
+
+				if (eventName === "error") {
+					onChatStreamError?.(
+						parsed.error ?? "Something went wrong. Please try again.",
+					);
+					continue;
+				}
+
+				if (parsed.token) {
+					onChatStreamToken?.(parsed.token);
+				}
+			}
+		}
+	};
+
+	/**
+	 * Submits the current form value to the server.
+	 * @param {z.infer<typeof formSchema>} values - The validated form values.
+	 * @returns {void} This handler submits the message mutation.
+	 */
 	const onSubmit = (values: z.infer<typeof formSchema>) => {
 		onSendStart?.();
 		createMessage.mutate({

@@ -2,8 +2,8 @@ import { useTRPC } from "@/trpc/client";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
-import { useEffect, useRef } from "react";
-import type { Fragment } from "@prisma/client";
+import { useEffect, useRef, useState } from "react";
+import type { Fragment, MessageType } from "@prisma/client";
 import { MessageLoading } from "./message-loading";
 
 interface Props {
@@ -14,6 +14,11 @@ interface Props {
 	onUserMessageSendStart: () => void;
 }
 
+/**
+ * Coordinates the message list, streaming preview, and message composer.
+ * @param {Props} props - The container props.
+ * @returns {JSX.Element} The rendered messages container.
+ */
 export const MessagesContainer = ({
 	projectId,
 	activeFragment,
@@ -24,6 +29,11 @@ export const MessagesContainer = ({
 	const trpc = useTRPC();
 	const bottomRef = useRef<HTMLDivElement>(null);
 	const lastAssistantMessageIdRef = useRef<string | null>(null);
+	const [streamingMessage, setStreamingMessage] = useState<{
+		content: string;
+		type: MessageType;
+		isStreaming: boolean;
+	} | null>(null);
 
 	const { data: messages } = useSuspenseQuery(
 		trpc.messages.getMany.queryOptions(
@@ -52,7 +62,7 @@ export const MessagesContainer = ({
 
 	useEffect(() => {
 		bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-	}, [messages.length]);
+	}, [messages.length, streamingMessage?.content]);
 
 	const lastMessage = messages[messages.length - 1];
 	const isLastMessageUser = lastMessage?.role === "USER";
@@ -77,7 +87,19 @@ export const MessagesContainer = ({
 							type={message.type}
 						/>
 					))}
-					{isLastMessageUser && <MessageLoading />}
+					{streamingMessage && (
+						<MessageCard
+							content={streamingMessage.content}
+							role="ASSISTANT"
+							fragment={null}
+							createdAt={new Date()}
+							isActiveFragment={false}
+							onFragmentClick={() => undefined}
+							type={streamingMessage.type}
+							isStreaming={streamingMessage.isStreaming}
+						/>
+					)}
+					{isLastMessageUser && !streamingMessage && <MessageLoading />}
 					<div ref={bottomRef} />
 				</div>
 			</div>
@@ -86,6 +108,28 @@ export const MessagesContainer = ({
 				<MessageForm
 					projectId={projectId}
 					onSendStart={onUserMessageSendStart}
+					onChatStreamStart={() =>
+						setStreamingMessage({
+							content: "",
+							type: "RESULT",
+							isStreaming: true,
+						})
+					}
+					onChatStreamToken={(token) =>
+						setStreamingMessage((current) => ({
+							content: `${current?.content ?? ""}${token}`,
+							type: current?.type ?? "RESULT",
+							isStreaming: true,
+						}))
+					}
+					onChatStreamEnd={() => setStreamingMessage(null)}
+					onChatStreamError={(message) =>
+						setStreamingMessage({
+							content: message,
+							type: "ERROR",
+							isStreaming: false,
+						})
+					}
 				/>
 			</div>
 		</div>

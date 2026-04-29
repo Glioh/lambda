@@ -10,6 +10,11 @@ interface UserMessageProps {
 	content: string;
 }
 
+/**
+ * Renders a user-authored message bubble.
+ * @param {UserMessageProps} props - The user message props.
+ * @returns {JSX.Element} The rendered user message bubble.
+ */
 const UserMessage = ({ content }: UserMessageProps) => {
 	return (
 		<div className="flex justify-end pb-4 pr-2 pl-10">
@@ -26,6 +31,11 @@ interface FragmentCardProps {
 	onFragmentClick: (fragment: Fragment) => void;
 }
 
+/**
+ * Renders a clickable fragment preview card.
+ * @param {FragmentCardProps} props - The fragment card props.
+ * @returns {JSX.Element} The rendered fragment card.
+ */
 const FragmentCard = ({
 	fragment,
 	isActiveFragment,
@@ -62,8 +72,14 @@ interface AssistantMessageProps {
 	isActiveFragment: boolean;
 	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
+	isStreaming?: boolean;
 }
 
+/**
+ * Renders an assistant message, including the optional fragment preview.
+ * @param {AssistantMessageProps} props - The assistant message props.
+ * @returns {JSX.Element} The rendered assistant message block.
+ */
 const AssistantMessage = ({
 	content,
 	fragment,
@@ -71,6 +87,7 @@ const AssistantMessage = ({
 	isActiveFragment,
 	onFragmentClick,
 	type,
+	isStreaming,
 }: AssistantMessageProps) => {
 	return (
 		<div
@@ -93,7 +110,16 @@ const AssistantMessage = ({
 				</span>
 			</div>
 			<div className="pl-8.5 flex flex-col gap-y-4">
-				<span>{content}</span>
+				<span className="whitespace-pre-wrap">
+					{content}
+					{isStreaming && (
+						<span className="inline-flex pl-1 text-muted-foreground">
+							<span className="animate-pulse">.</span>
+							<span className="animate-pulse delay-150">.</span>
+							<span className="animate-pulse delay-300">.</span>
+						</span>
+					)}
+				</span>
 				{fragment && type === "RESULT" && (
 					<FragmentCard
 						fragment={fragment}
@@ -114,8 +140,14 @@ interface MessageCardProps {
 	isActiveFragment: boolean;
 	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
+	isStreaming?: boolean;
 }
 
+/**
+ * Renders either the user message bubble or assistant message layout.
+ * @param {MessageCardProps} props - The message card props.
+ * @returns {JSX.Element} The rendered message card.
+ */
 export const MessageCard = ({
 	content,
 	role,
@@ -124,6 +156,7 @@ export const MessageCard = ({
 	isActiveFragment,
 	onFragmentClick,
 	type,
+	isStreaming,
 }: MessageCardProps) => {
 	if (role === "ASSISTANT") {
 		return (
@@ -134,6 +167,7 @@ export const MessageCard = ({
 				isActiveFragment={isActiveFragment}
 				onFragmentClick={onFragmentClick}
 				type={type}
+				isStreaming={isStreaming}
 			/>
 		);
 	}
