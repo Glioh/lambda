@@ -35,10 +35,40 @@ export const ProjectForm = () => {
 		},
 	});
 
+	const confirmRun = useMutation(trpc.routing.confirmRun.mutationOptions());
+
 	const createProject = useMutation(
 		trpc.projects.create.mutationOptions({
-			onSuccess: (data) => {
+			onSuccess: async (data) => {
 				queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+
+				if (data.routing.decision !== "chat") {
+					// Build path: confirm the pending run to dispatch the Inngest job
+					if (data.pendingRunId) {
+						try {
+							await confirmRun.mutateAsync({
+								pendingRunId: data.pendingRunId,
+							});
+						} catch (error) {
+							const errorMessage =
+								error instanceof Error
+									? error.message
+									: "Unable to start build.";
+							toast.error(errorMessage);
+						}
+					}
+				} else {
+					// Chat path: fire-and-forget — server saves ASSISTANT message to DB,
+					// project page poll picks it up
+					fetch("/api/chat", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify({ value: data.messages[0]?.content, projectId: data.id }),
+					}).catch(() => {
+						// Silently ignore — project page will show error state via poll
+					});
+				}
+
 				router.push(`/projects/${data.id}`);
 				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
 			},
@@ -72,7 +102,7 @@ export const ProjectForm = () => {
 	};
 
 	const [isFocused, setIsFocused] = React.useState(false);
-	const isPending = createProject.isPending;
+	const isPending = createProject.isPending || confirmRun.isPending;
 	const isButtonDisabled = isPending || !form.formState.isValid;
 
 	return (

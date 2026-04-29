@@ -56,6 +56,8 @@ export const MessageForm = ({
 		},
 	});
 
+	const confirmRun = useMutation(trpc.routing.confirmRun.mutationOptions());
+
 	const createMessage = useMutation(
 		trpc.messages.create.mutationOptions({
 			onSuccess: async (message, variables) => {
@@ -66,19 +68,40 @@ export const MessageForm = ({
 				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
 
 				if (message.routing.decision !== "chat") {
+					if (!message.pendingRunId) {
+						toast.error("Unable to start build.");
+						return;
+					}
+
+					try {
+						await confirmRun.mutateAsync({
+							pendingRunId: message.pendingRunId,
+							draftValue: variables.value,
+						});
+						await queryClient.invalidateQueries(
+							trpc.messages.getMany.queryOptions({ projectId }),
+						);
+					} catch (error) {
+						const errorMessage =
+							error instanceof Error
+								? error.message
+								: "Unable to start build.";
+						toast.error(errorMessage);
+					}
+
 					return;
 				}
 
 				try {
 					await streamChatResponse(variables.value);
 				} catch (error) {
-					const message =
+					const errorMessage =
 						error instanceof Error
 							? error.message
 							: "Something went wrong. Please try again.";
 
-					onChatStreamError?.(message);
-					toast.error(message);
+					onChatStreamError?.(errorMessage);
+					toast.error(errorMessage);
 				}
 			},
 			onError: (error) => {
@@ -181,7 +204,7 @@ export const MessageForm = ({
 
 	const [isFocused, setIsFocused] = React.useState(false);
 	const showUsage = !!usage && usage.remainingPoints <= LOW_CREDITS_THRESHOLD;
-	const isPending = createMessage.isPending;
+	const isPending = createMessage.isPending || confirmRun.isPending;
 	const isButtonDisabled = isPending || !form.formState.isValid;
 
 	return (
