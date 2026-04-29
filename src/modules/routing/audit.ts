@@ -1,5 +1,8 @@
 import { Prisma } from "@prisma/client";
 
+/**
+ * Actions that can be recorded in the routing audit log.
+ */
 export type RoutingAuditAction =
 	| "create"
 	| "request_clarification"
@@ -28,6 +31,12 @@ interface LogAuditEventInput {
 	payload?: unknown;
 }
 
+/**
+ * Writes a routing audit log entry.
+ * @param {PrismaLike<TRow>} prisma - Prisma-like client with `routingAuditLog.create`.
+ * @param {LogAuditEventInput} input - The audit event data to persist.
+ * @returns {Promise<TRow>} The created audit log row.
+ */
 export async function logAuditEvent<TRow>(
 	prisma: PrismaLike<TRow>,
 	{ pendingRunId, action, actor, payload }: LogAuditEventInput,
@@ -37,7 +46,9 @@ export async function logAuditEvent<TRow>(
 			pendingRunId,
 			action,
 			actor,
-			...(payload === undefined ? {} : { payload: payload as Prisma.InputJsonValue }),
+			...(payload === undefined
+				? {}
+				: { payload: payload as Prisma.InputJsonValue }),
 		},
 	});
 }

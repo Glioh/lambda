@@ -88,26 +88,27 @@ export const projectsRouter = createTRPCRouter({
 				return { ...createdProject, routing: decision, pendingRunId: null };
 			}
 
-			if (decision.requiresConfirmation) {
-				const pendingRun = await prisma.pendingRun.create({
-					data: {
-						status: "waiting_confirmation",
-						draftValue: input.value,
-						projectId: createdProject.id,
-						messageId: createdProject.messages[0]?.id,
-					},
-				});
+			// By this point we know the decision is to build so we can create a pending run in our db
+			const pendingRun = await prisma.pendingRun.create({
+				data: {
+					status: "waiting_confirmation",
+					draftValue: input.value,
+					projectId: createdProject.id,
+					messageId: createdProject.messages[0]?.id,
+				},
+			});
 
-				await logAuditEvent(prisma, {
-					pendingRunId: pendingRun.id,
-					action: "create",
-					actor: ctx.auth.userId,
-					payload: { decision },
-				});
+			await logAuditEvent(prisma, {
+				pendingRunId: pendingRun.id,
+				action: "create",
+				actor: ctx.auth.userId,
+				payload: { decision },
+			});
 
-				return { ...createdProject, routing: decision, pendingRunId: pendingRun.id };
-			}
-
-			return { ...createdProject, routing: decision, pendingRunId: null };
+			return {
+				...createdProject,
+				routing: decision,
+				pendingRunId: pendingRun.id,
+			};
 		}),
 });
