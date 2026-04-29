@@ -21,6 +21,7 @@ model Project {
   updatedAt DateTime @updatedAt
 
   messages Message[]
+  pendingRuns PendingRun[]
 
 }
 
@@ -46,6 +47,7 @@ model Message {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   fragment Fragment?
+  pendingRuns PendingRun[]
 }
 
 model Fragment {
@@ -66,4 +68,42 @@ model Usage {
   key String @id
   points Int
   expire DateTime?
+}
+
+enum PendingRunStatus {
+  clarification_required
+  waiting_confirmation
+  confirmed
+  dispatched
+  cancelled
+}
+
+model PendingRun {
+  id String @id @default(uuid())
+  status PendingRunStatus @default(waiting_confirmation)
+  draftValue String
+  clarificationPrompt String?
+  dispatchedAt DateTime?
+  cancelledAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectId String
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  messageId String?
+  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  auditLogs RoutingAuditLog[]
+}
+
+model RoutingAuditLog {
+  id String @id @default(uuid())
+  pendingRunId String
+  pendingRun PendingRun @relation(fields: [pendingRunId], references: [id], onDelete: Cascade)
+
+  action String
+  actor String
+  payload Json?
+  createdAt DateTime @default(now())
 }
