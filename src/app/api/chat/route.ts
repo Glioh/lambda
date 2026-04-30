@@ -4,7 +4,7 @@ import { decideRoute } from "@/modules/routing";
 import { CHAT_PROMPT } from "@/prompt";
 import z from "zod";
 
-const CHAT_MODEL = "gpt-5-mini";
+const CHAT_MODEL = "gpt-4.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const HISTORY_LIMIT = 20;
 
@@ -116,7 +116,15 @@ const encodeData = (data: { token: string } | "[DONE]") => {
  * Encodes an SSE error frame for the chat stream.
  */
 const encodeError = (message: string) =>
-	encoder.encode(`event: error\ndata: ${JSON.stringify({ error: message })}\n\n`);
+	encoder.encode(
+		`event: error\ndata: ${JSON.stringify({ error: message })}\n\n`,
+	);
+
+/**
+ * Encodes an SSE status event for the chat stream.
+ */
+const encodeStatus = (status: string) =>
+	encoder.encode(`event: status\ndata: ${JSON.stringify({ status })}\n\n`);
 
 /**
  * Converts persisted message roles into OpenAI chat roles.
@@ -147,15 +155,18 @@ function createFetchOpenAIClient(): OpenAIChatClient {
 		chat: {
 			completions: {
 				create: async (body, options) => {
-					const response = await fetch("https://api.openai.com/v1/chat/completions", {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-							Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
+					const response = await fetch(
+						"https://api.openai.com/v1/chat/completions",
+						{
+							method: "POST",
+							headers: {
+								"Content-Type": "application/json",
+								Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
+							},
+							body: JSON.stringify(body),
+							signal: options?.signal,
 						},
-						body: JSON.stringify(body),
-						signal: options?.signal,
-					});
+					);
 
 					if (!response.ok || !response.body) {
 						throw new Error("OpenAI chat request failed.");
@@ -255,10 +266,20 @@ export function createChatPostHandler(
 			messageLength: value.length,
 		});
 
-		const project = await dependencies.prisma.project.findUnique({
-			where: { id: projectId, userId },
-			select: { id: true },
-		});
+		// Run project lookup and history fetch in parallel — projectId from
+		// input is the same value project.id would resolve to.
+		const [project, history] = await Promise.all([
+			dependencies.prisma.project.findUnique({
+				where: { id: projectId, userId },
+				select: { id: true },
+			}),
+			dependencies.prisma.message.findMany({
+				where: { projectId },
+				orderBy: { createdAt: "desc" },
+				take: HISTORY_LIMIT,
+				select: { role: true, content: true },
+			}),
+		]);
 
 		logLatency(traceId, "chat.route.projectLookup.end", requestStart, {
 			found: !!project,
@@ -281,13 +302,6 @@ export function createChatPostHandler(
 			);
 		}
 
-		const history = await dependencies.prisma.message.findMany({
-			where: { projectId: project.id },
-			orderBy: { createdAt: "desc" },
-			take: HISTORY_LIMIT,
-			select: { role: true, content: true },
-		});
-
 		logLatency(traceId, "chat.route.history.end", requestStart, {
 			historyCount: history.length,
 		});
@@ -308,6 +322,8 @@ export function createChatPostHandler(
 
 		const stream = new ReadableStream<Uint8Array>({
 			start: async (controller) => {
+				// Emit immediate ack so client sees activity before model TTFT
+				controller.enqueue(encodeStatus("thinking"));
 				logLatency(traceId, "chat.stream.start", requestStart);
 				const abortController = new AbortController();
 				let content = "";

@@ -88,25 +88,23 @@ export const MessageForm = ({
 					logLatency(trace.traceId, "createMessage.success", trace.startTime, {
 						routingDecision: message.routing.decision,
 					});
-					logLatency(
-						trace.traceId,
-						"messages.invalidate.start",
-						trace.startTime,
-					);
 				}
 
 				form.reset();
-				await queryClient.invalidateQueries(
-					trpc.messages.getMany.queryOptions({ projectId }),
-				);
 
-				if (trace) {
-					logLatency(trace.traceId, "messages.invalidate.end", trace.startTime);
-				}
-
+				// Fire-and-forget for usage — not on critical path
 				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
 
 				if (message.routing.decision !== "chat") {
+					// Build path: await invalidation since we need fresh data before confirmRun
+					await queryClient.invalidateQueries(
+						trpc.messages.getMany.queryOptions({ projectId }),
+					);
+
+					if (trace) {
+						logLatency(trace.traceId, "messages.invalidate.end", trace.startTime);
+					}
+
 					if (!message.pendingRunId) {
 						toast.error("Unable to start build.");
 						return;
@@ -163,6 +161,20 @@ export const MessageForm = ({
 					}
 
 					return;
+				}
+
+				// Chat path: don't block stream on message list refresh
+				// The 1.5s poll interval will pick up the new message
+				queryClient.invalidateQueries(
+					trpc.messages.getMany.queryOptions({ projectId }),
+				);
+
+				if (trace) {
+					logLatency(
+						trace.traceId,
+						"stream.invalidate.deferred",
+						trace.startTime,
+					);
 				}
 
 				try {
@@ -314,6 +326,15 @@ export const MessageForm = ({
 					onChatStreamError?.(
 						parsed.error ?? "Something went wrong. Please try again.",
 					);
+					continue;
+				}
+
+				if (eventName === "status") {
+					// Status events are acknowledgments, not content
+					if (trace && !firstChunkLogged) {
+						firstChunkLogged = true;
+						logLatency(trace.traceId, "stream.statusAck", trace.startTime);
+					}
 					continue;
 				}
 
