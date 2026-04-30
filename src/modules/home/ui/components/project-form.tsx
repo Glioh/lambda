@@ -57,16 +57,6 @@ export const ProjectForm = () => {
 							toast.error(errorMessage);
 						}
 					}
-				} else {
-					// Chat path: fire-and-forget — server saves ASSISTANT message to DB,
-					// project page poll picks it up
-					fetch("/api/chat", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ value: data.messages[0]?.content, projectId: data.id }),
-					}).catch(() => {
-						// Silently ignore — project page will show error state via poll
-					});
 				}
 
 				router.push(`/projects/${data.id}`);
