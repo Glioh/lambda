@@ -10,20 +10,6 @@ export const createTRPCContext = cache(async () => {
 
 export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
-const logLatency = (
-	traceId: string | undefined,
-	step: string,
-	startTime: number,
-	details?: Record<string, unknown>,
-) => {
-	console.log("[chat-latency]", {
-		traceId: traceId ?? "unknown",
-		step,
-		elapsedMs: Date.now() - startTime,
-		...details,
-	});
-};
-
 const t = initTRPC.context<Context>().create({
 	/**
 	 * @see: https://trpc.io/docs/server/data-transformers
@@ -45,21 +31,9 @@ const isAuthed = t.middleware(({ next, ctx }) => {
 	});
 });
 
-const hasUsageCredits = t.middleware(async ({ next, input }) => {
-	const startTime = Date.now();
-
+const hasUsageCredits = t.middleware(async ({ next }) => {
 	try {
-		const traceId =
-			input &&
-			typeof input === "object" &&
-			"debugTraceId" in input &&
-			typeof input.debugTraceId === "string"
-				? input.debugTraceId
-				: undefined;
-
-		logLatency(traceId, "trpc.usageMiddleware.start", startTime);
-		await consumeCredits(traceId);
-		logLatency(traceId, "trpc.usageMiddleware.complete", startTime);
+		await consumeCredits();
 		return next();
 	} catch (error) {
 		if (error instanceof Error) {

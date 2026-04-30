@@ -14,7 +14,6 @@ const inputSchema = z.object({
 		.min(1, { message: "Message cannot be empty." })
 		.max(10000, "Prompt is too long"),
 	projectId: z.string().min(1, { message: "Project ID is required." }),
-	debugTraceId: z.string().min(1).optional(),
 });
 
 type ChatRole = "system" | "user" | "assistant";
@@ -83,23 +82,6 @@ interface ChatRouteDependencies {
 }
 
 const encoder = new TextEncoder();
-
-const createServerTrace = () =>
-	`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
-const logLatency = (
-	traceId: string,
-	step: string,
-	startTime: number,
-	details?: Record<string, unknown>,
-) => {
-	console.log("[chat-latency]", {
-		traceId,
-		step,
-		elapsedMs: Date.now() - startTime,
-		...details,
-	});
-};
 
 /**
  * Encodes a chat token or completion marker as an SSE data frame.
@@ -234,26 +216,15 @@ export function createChatPostHandler(
 	};
 
 	return async function POST(request: Request) {
-		const requestStart = Date.now();
-		const requestBody = await request.json();
-		const parsedInput = inputSchema.safeParse(requestBody);
-		const traceId =
-			parsedInput.success && parsedInput.data.debugTraceId
-				? parsedInput.data.debugTraceId
-				: createServerTrace();
-
-		logLatency(traceId, "chat.route.start", requestStart);
 		const { userId } = await dependencies.auth();
-		logLatency(traceId, "chat.route.auth.end", requestStart, {
-			authenticated: !!userId,
-		});
 
 		if (!userId) {
 			return Response.json({ error: "Not authenticated" }, { status: 401 });
 		}
 
+		const parsedInput = inputSchema.safeParse(await request.json());
+
 		if (!parsedInput.success) {
-			logLatency(traceId, "chat.route.input.invalid", requestStart);
 			return Response.json(
 				{ error: parsedInput.error.flatten() },
 				{ status: 400 },
@@ -261,10 +232,6 @@ export function createChatPostHandler(
 		}
 
 		const { value, projectId } = parsedInput.data;
-		logLatency(traceId, "chat.route.input.end", requestStart, {
-			projectId,
-			messageLength: value.length,
-		});
 
 		// Run project lookup and history fetch in parallel — projectId from
 		// input is the same value project.id would resolve to.
@@ -281,19 +248,11 @@ export function createChatPostHandler(
 			}),
 		]);
 
-		logLatency(traceId, "chat.route.projectLookup.end", requestStart, {
-			found: !!project,
-		});
-
 		if (!project) {
 			return Response.json({ error: "Project not found." }, { status: 404 });
 		}
 
 		const routing = dependencies.decideRoute({ value, projectId: project.id });
-		logLatency(traceId, "chat.route.routing.end", requestStart, {
-			decision: routing.decision,
-			decisionSource: routing.decisionSource,
-		});
 
 		if (routing.decision !== "chat") {
 			return Response.json(
@@ -301,10 +260,6 @@ export function createChatPostHandler(
 				{ status: 400 },
 			);
 		}
-
-		logLatency(traceId, "chat.route.history.end", requestStart, {
-			historyCount: history.length,
-		});
 
 		const orderedHistory = history.reverse();
 		const messages: ChatCompletionMessage[] = [
@@ -324,19 +279,11 @@ export function createChatPostHandler(
 			start: async (controller) => {
 				// Emit immediate ack so client sees activity before model TTFT
 				controller.enqueue(encodeStatus("thinking"));
-				logLatency(traceId, "chat.stream.start", requestStart);
 				const abortController = new AbortController();
 				let content = "";
-				let firstTokenLogged = false;
 
 				const runCompletion = async () => {
-					logLatency(traceId, "chat.openaiClient.start", requestStart);
 					const openai = await dependencies.createOpenAIClient();
-					logLatency(traceId, "chat.openaiClient.end", requestStart);
-					logLatency(traceId, "chat.openaiRequest.start", requestStart, {
-						messageCount: messages.length,
-						model: CHAT_MODEL,
-					});
 					const completionStream = await openai.chat.completions.create(
 						{
 							model: CHAT_MODEL,
@@ -345,7 +292,6 @@ export function createChatPostHandler(
 						},
 						{ signal: abortController.signal },
 					);
-					logLatency(traceId, "chat.openaiRequest.response", requestStart);
 
 					for await (const chunk of completionStream) {
 						const token = chunk.choices?.[0]?.delta?.content ?? "";
@@ -355,18 +301,9 @@ export function createChatPostHandler(
 						}
 
 						content += token;
-						if (!firstTokenLogged) {
-							firstTokenLogged = true;
-							logLatency(traceId, "chat.openai.firstToken", requestStart, {
-								length: token.length,
-							});
-						}
 						controller.enqueue(encodeData({ token }));
 					}
 
-					logLatency(traceId, "chat.openai.stream.complete", requestStart, {
-						contentLength: content.length,
-					});
 					return "completed" as const;
 				};
 
@@ -379,9 +316,6 @@ export function createChatPostHandler(
 					]);
 
 					if (result === "timeout") {
-						logLatency(traceId, "chat.stream.timeout", requestStart, {
-							contentLength: content.length,
-						});
 						abortController.abort();
 						completionPromise.catch(() => undefined);
 
@@ -418,17 +352,9 @@ export function createChatPostHandler(
 						});
 					}
 
-					logLatency(traceId, "chat.stream.persisted", requestStart, {
-						contentLength: content.length,
-					});
 					controller.enqueue(encodeData("[DONE]"));
-					logLatency(traceId, "chat.stream.done.enqueued", requestStart);
 					controller.close();
-				} catch (error) {
-					logLatency(traceId, "chat.stream.error", requestStart, {
-						message: error instanceof Error ? error.message : "Unknown error",
-						contentLength: content.length,
-					});
+				} catch {
 					if (content.length > 0) {
 						await dependencies.prisma.message.create({
 							data: {
@@ -453,13 +379,11 @@ export function createChatPostHandler(
 					}
 
 					controller.enqueue(encodeData("[DONE]"));
-					logLatency(traceId, "chat.stream.done.enqueued", requestStart);
 					controller.close();
 				}
 			},
 		});
 
-		logLatency(traceId, "chat.route.response.created", requestStart);
 		return new Response(stream, {
 			headers: {
 				"Content-Type": "text/event-stream",

@@ -13,23 +13,6 @@ import { toast } from "sonner";
 import { Usage } from "./usage";
 import { useRouter } from "next/navigation";
 
-const createLatencyTrace = () =>
-	`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
-const logLatency = (
-	traceId: string,
-	step: string,
-	startTime: number,
-	details?: Record<string, unknown>,
-) => {
-	console.log("[chat-latency]", {
-		traceId,
-		step,
-		elapsedMs: Math.round(performance.now() - startTime),
-		...details,
-	});
-};
-
 interface Props {
 	projectId: string;
 	onSendStart?: () => void;
@@ -63,10 +46,6 @@ export const MessageForm = ({
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
-	const submissionTraceRef = React.useRef<{
-		traceId: string;
-		startTime: number;
-	} | null>(null);
 
 	const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
@@ -82,14 +61,6 @@ export const MessageForm = ({
 	const createMessage = useMutation(
 		trpc.messages.create.mutationOptions({
 			onSuccess: async (message, variables) => {
-				const trace = submissionTraceRef.current;
-
-				if (trace) {
-					logLatency(trace.traceId, "createMessage.success", trace.startTime, {
-						routingDecision: message.routing.decision,
-					});
-				}
-
 				form.reset();
 
 				// Fire-and-forget for usage — not on critical path
@@ -101,61 +72,25 @@ export const MessageForm = ({
 						trpc.messages.getMany.queryOptions({ projectId }),
 					);
 
-					if (trace) {
-						logLatency(trace.traceId, "messages.invalidate.end", trace.startTime);
-					}
-
 					if (!message.pendingRunId) {
 						toast.error("Unable to start build.");
 						return;
 					}
 
 					try {
-						if (trace) {
-							logLatency(
-								trace.traceId,
-								"confirmRun.start",
-								trace.startTime,
-								{ pendingRunId: message.pendingRunId },
-							);
-						}
-
 						await confirmRun.mutateAsync({
 							pendingRunId: message.pendingRunId,
 							draftValue: variables.value,
 						});
 
-						if (trace) {
-							logLatency(trace.traceId, "confirmRun.end", trace.startTime);
-							logLatency(
-								trace.traceId,
-								"messages.invalidate.afterConfirm.start",
-								trace.startTime,
-							);
-						}
-
 						await queryClient.invalidateQueries(
 							trpc.messages.getMany.queryOptions({ projectId }),
 						);
-
-						if (trace) {
-							logLatency(
-								trace.traceId,
-								"messages.invalidate.afterConfirm.end",
-								trace.startTime,
-							);
-						}
 					} catch (error) {
 						const errorMessage =
 							error instanceof Error
 								? error.message
 								: "Unable to start build.";
-
-						if (trace) {
-							logLatency(trace.traceId, "confirmRun.error", trace.startTime, {
-								message: errorMessage,
-							});
-						}
 
 						toast.error(errorMessage);
 					}
@@ -169,42 +104,19 @@ export const MessageForm = ({
 					trpc.messages.getMany.queryOptions({ projectId }),
 				);
 
-				if (trace) {
-					logLatency(
-						trace.traceId,
-						"stream.invalidate.deferred",
-						trace.startTime,
-					);
-				}
-
 				try {
-					await streamChatResponse(variables.value, trace);
+					await streamChatResponse(variables.value);
 				} catch (error) {
 					const errorMessage =
 						error instanceof Error
 							? error.message
 							: "Something went wrong. Please try again.";
 
-					if (trace) {
-						logLatency(trace.traceId, "stream.error", trace.startTime, {
-							message: errorMessage,
-						});
-					}
-
 					onChatStreamError?.(errorMessage);
 					toast.error(errorMessage);
 				}
 			},
 			onError: (error) => {
-				const trace = submissionTraceRef.current;
-
-				if (trace) {
-					logLatency(trace.traceId, "createMessage.error", trace.startTime, {
-						code: error.data?.code,
-						message: error.message,
-					});
-				}
-
 				toast.error(error.message);
 
 				if (error.data?.code === "TOO_MANY_REQUESTS") {
@@ -219,16 +131,8 @@ export const MessageForm = ({
 	 * @param {string} value - The submitted user prompt.
 	 * @returns {Promise<void>} A promise that resolves when streaming ends.
 	 */
-	const streamChatResponse = async (
-		value: string,
-		trace: { traceId: string; startTime: number } | null,
-	) => {
+	const streamChatResponse = async (value: string) => {
 		onChatStreamStart?.();
-
-		if (trace) {
-			logLatency(trace.traceId, "stream.start", trace.startTime);
-			logLatency(trace.traceId, "chat.fetch.start", trace.startTime);
-		}
 
 		const response = await fetch("/api/chat", {
 			method: "POST",
@@ -238,16 +142,8 @@ export const MessageForm = ({
 			body: JSON.stringify({
 				value,
 				projectId,
-				debugTraceId: trace?.traceId,
 			}),
 		});
-
-		if (trace) {
-			logLatency(trace.traceId, "chat.fetch.response", trace.startTime, {
-				ok: response.ok,
-				status: response.status,
-			});
-		}
 
 		if (!response.ok || !response.body) {
 			throw new Error("Unable to start chat response.");
@@ -256,24 +152,12 @@ export const MessageForm = ({
 		const reader = response.body.getReader();
 		const decoder = new TextDecoder();
 		let buffer = "";
-		let firstChunkLogged = false;
-		let firstTokenLogged = false;
 
 		while (true) {
 			const { value: chunk, done } = await reader.read();
 
 			if (done) {
-				if (trace) {
-					logLatency(trace.traceId, "stream.reader.done", trace.startTime);
-				}
 				break;
-			}
-
-			if (trace && !firstChunkLogged) {
-				firstChunkLogged = true;
-				logLatency(trace.traceId, "stream.firstChunk", trace.startTime, {
-					bytes: chunk.length,
-				});
 			}
 
 			buffer += decoder.decode(chunk, { stream: true });
@@ -295,26 +179,9 @@ export const MessageForm = ({
 				}
 
 				if (data === "[DONE]") {
-					if (trace) {
-						logLatency(trace.traceId, "stream.done", trace.startTime);
-						logLatency(
-							trace.traceId,
-							"messages.invalidate.afterStream.start",
-							trace.startTime,
-						);
-					}
-
 					await queryClient.invalidateQueries(
 						trpc.messages.getMany.queryOptions({ projectId }),
 					);
-
-					if (trace) {
-						logLatency(
-							trace.traceId,
-							"messages.invalidate.afterStream.end",
-							trace.startTime,
-						);
-					}
 
 					onChatStreamEnd?.();
 					return;
@@ -330,22 +197,10 @@ export const MessageForm = ({
 				}
 
 				if (eventName === "status") {
-					// Status events are acknowledgments, not content
-					if (trace && !firstChunkLogged) {
-						firstChunkLogged = true;
-						logLatency(trace.traceId, "stream.statusAck", trace.startTime);
-					}
 					continue;
 				}
 
 				if (parsed.token) {
-					if (trace && !firstTokenLogged) {
-						firstTokenLogged = true;
-						logLatency(trace.traceId, "stream.firstToken", trace.startTime, {
-							length: parsed.token.length,
-						});
-					}
-
 					onChatStreamToken?.(parsed.token);
 				}
 			}
@@ -358,22 +213,10 @@ export const MessageForm = ({
 	 * @returns {void} This handler submits the message mutation.
 	 */
 	const onSubmit = (values: z.infer<typeof formSchema>) => {
-		const trace = {
-			traceId: createLatencyTrace(),
-			startTime: performance.now(),
-		};
-
-		submissionTraceRef.current = trace;
 		onSendStart?.();
-		logLatency(trace.traceId, "submit", trace.startTime, {
-			projectId,
-			messageLength: values.value.length,
-		});
-		logLatency(trace.traceId, "createMessage.start", trace.startTime);
 		createMessage.mutate({
 			value: values.value,
 			projectId,
-			debugTraceId: trace.traceId,
 		});
 	};
 
