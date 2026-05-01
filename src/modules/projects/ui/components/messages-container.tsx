@@ -76,10 +76,17 @@ export const MessagesContainer = ({
 		);
 	};
 
+	// Start streaming response if last message is from user and we aren't already streaming a response
+	// This occurs when we type a chat prompt from the home page it'll trigger this and start streaming the response immediately when we navigate to the project page
+	// MessageForm will not trigger streaming since it checks if the message is already sent before starting the stream, so this is a necessary effect to handle that case
 	useEffect(() => {
-		if (isLastMessageUser && !streamingMessage && !hasInitializedStreamRef.current) {
+		if (
+			isLastMessageUser &&
+			!streamingMessage &&
+			!hasInitializedStreamRef.current
+		) {
 			hasInitializedStreamRef.current = true;
-			
+
 			const streamChatResponse = async (value: string) => {
 				setStreamingMessage({
 					content: "",
@@ -141,11 +148,15 @@ export const MessagesContainer = ({
 								return;
 							}
 
-							const parsed = JSON.parse(data) as { token?: string; error?: string };
+							const parsed = JSON.parse(data) as {
+								token?: string;
+								error?: string;
+							};
 
 							if (eventName === "error") {
 								setStreamingMessage({
-									content: parsed.error ?? "Something went wrong. Please try again.",
+									content:
+										parsed.error ?? "Something went wrong. Please try again.",
 									type: "ERROR",
 									isStreaming: false,
 								});
@@ -181,10 +192,17 @@ export const MessagesContainer = ({
 			};
 
 			streamChatResponse(lastMessage.content).catch(() => {
-                hasInitializedStreamRef.current = false;
-            });
+				hasInitializedStreamRef.current = false;
+			});
 		}
-	}, [isLastMessageUser, streamingMessage, projectId, trpc, queryClient, lastMessage]);
+	}, [
+		isLastMessageUser,
+		streamingMessage,
+		projectId,
+		trpc,
+		queryClient,
+		lastMessage,
+	]);
 
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
@@ -192,8 +210,7 @@ export const MessagesContainer = ({
 				<div className="pt-2 pr-1">
 					{messages.map((message) => {
 						const clarificationRuns = message.pendingRuns.filter(
-							(pendingRun) =>
-								pendingRun.status === "clarification_required",
+							(pendingRun) => pendingRun.status === "clarification_required",
 						);
 
 						return (

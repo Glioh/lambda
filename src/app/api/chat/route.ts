@@ -37,6 +37,7 @@ interface OpenAIChatClient {
 	chat: {
 		completions: {
 			create: (
+				// create.completions.create
 				body: {
 					model: string;
 					messages: ChatCompletionMessage[];
@@ -48,6 +49,7 @@ interface OpenAIChatClient {
 	};
 }
 
+// Define a minimal Prisma client interface with only the methods used by the chat route, to avoid coupling to the full PrismaClient type.
 interface ChatPrismaClient {
 	project: {
 		findUnique: (args: {
@@ -61,18 +63,19 @@ interface ChatPrismaClient {
 			orderBy: { createdAt: "desc" };
 			take: number;
 			select: { role: true; content: true };
-		}) => Promise<Array<{ role: "USER" | "ASSISTANT"; content: string }>>;
+		}) => Promise<Array<{ role: "USER" | "ASSISTANT"; content: string }>>; // Promise resolves to arrray with key value pair role and content
 		create: (args: {
 			data: {
 				projectId: string;
-				content: string;
+				content: string; // The content of the message, either user input or assistant response.
 				role: "ASSISTANT";
 				type: "RESULT" | "ERROR";
 			};
-		}) => Promise<unknown>;
+		}) => Promise<unknown>; // Prisma will return the created message object, but we don't need to type it here since we don't use the return value - use unknown
 	};
 }
 
+// Define the dependencies for the chat route handler, allowing for easier testing and separation of concerns.
 interface ChatRouteDependencies {
 	auth: typeof auth;
 	prisma: ChatPrismaClient;
@@ -81,6 +84,8 @@ interface ChatRouteDependencies {
 	timeoutMs: number;
 }
 
+// SSE is technology that allows for streaming real time data to clients.
+// Chat route uses SSE which require sending data as bytes. encoder converts JSON into uint8Array
 const encoder = new TextEncoder();
 
 /**
@@ -110,12 +115,13 @@ const encodeStatus = (status: string) =>
 
 /**
  * Converts persisted message roles into OpenAI chat roles.
+ * Takes in "USER" or "ASSISTANT" from the database and returns "user" or "assistant" for OpenAI API.
  */
 const toOpenAIRole = (role: "USER" | "ASSISTANT"): "user" | "assistant" =>
 	role === "ASSISTANT" ? "assistant" : "user";
 
 /**
- * Resolves after the configured timeout window.
+ * Resolves after the configured timeout window. Used to race against the OpenAI completion stream to enforce a maximum response time for the chat route.
  */
 const timeoutAfter = (timeoutMs: number) =>
 	new Promise<"timeout">((resolve) => {
@@ -131,6 +137,7 @@ async function createDefaultOpenAIClient(): Promise<OpenAIChatClient> {
 
 /**
  * Builds a minimal OpenAI chat client over fetch.
+ * Returns object matching the OpenAIChatClient interface, with a chat.completions.create method that calls the OpenAI API and returns an async generator for streaming responses.
  */
 function createFetchOpenAIClient(): OpenAIChatClient {
 	return {
@@ -147,7 +154,7 @@ function createFetchOpenAIClient(): OpenAIChatClient {
 							},
 							body: JSON.stringify(body),
 							signal: options?.signal,
-						},
+						}, // response.body is a stream of data coming from openai
 					);
 
 					if (!response.ok || !response.body) {
@@ -165,13 +172,14 @@ function createFetchOpenAIClient(): OpenAIChatClient {
  * Parses OpenAI's streaming response into JSON chunks.
  */
 async function* parseOpenAIStream(
-	body: ReadableStream<Uint8Array>,
+	body: ReadableStream<Uint8Array>, // ReadableStream whose chunks are Uint8Arrays of bytes
 ): AsyncGenerator<StreamChunk> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
 
 	while (true) {
+		``;
 		const { value, done } = await reader.read();
 		if (done) {
 			break;
@@ -211,7 +219,7 @@ export function createChatPostHandler(
 		prisma,
 		decideRoute,
 		createOpenAIClient: createDefaultOpenAIClient,
-		timeoutMs: Number(process.env.CHAT_STREAM_TIMEOUT_MS ?? DEFAULT_TIMEOUT_MS),
+		timeoutMs: Number(DEFAULT_TIMEOUT_MS),
 		...overrides,
 	};
 
@@ -244,7 +252,7 @@ export function createChatPostHandler(
 				where: { projectId },
 				orderBy: { createdAt: "desc" },
 				take: HISTORY_LIMIT,
-				select: { role: true, content: true },
+				select: { role: true, content: true }, // select is used to return specific fields - role and content
 			}),
 		]);
 
@@ -252,6 +260,7 @@ export function createChatPostHandler(
 			return Response.json({ error: "Project not found." }, { status: 404 });
 		}
 
+		// Build or chat?
 		const routing = dependencies.decideRoute({ value, projectId: project.id });
 
 		if (routing.decision !== "chat") {
