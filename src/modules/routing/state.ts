@@ -14,8 +14,9 @@ type PrismaLike<TRow = unknown> = { // wrap prisma type to avoid importing the e
 	};
 };
 
-export const STATE_TRANSITIONS: Record<PendingRunStatus, PendingRunStatus[]> = {
-	clarification_required: ["waiting_confirmation", "cancelled"],
+export const STATE_TRANSITIONS: Partial<
+	Record<PendingRunStatus, PendingRunStatus[]>
+> = {
 	waiting_confirmation: ["confirmed", "cancelled"],
 	confirmed: ["dispatched"],
 	dispatched: [],

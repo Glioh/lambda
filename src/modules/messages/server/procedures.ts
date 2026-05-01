@@ -26,16 +26,6 @@ export const messagesRouter = createTRPCRouter({
 				},
 				include: {
 					fragment: true,
-					pendingRuns: {
-						where: {
-							status: {
-								notIn: ["cancelled"],
-							},
-						},
-						orderBy: {
-							createdAt: "asc",
-						},
-					},
 				},
 				orderBy: {
 					updatedAt: "asc",

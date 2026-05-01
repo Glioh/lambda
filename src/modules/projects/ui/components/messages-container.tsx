@@ -1,9 +1,8 @@
 import { useTRPC } from "@/trpc/client";
 import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
-import { ClarificationCard } from "./clarification-card";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
-import { Fragment as ReactFragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Fragment, MessageType } from "@prisma/client";
 import { MessageLoading } from "./message-loading";
 import { toast } from "sonner";
@@ -70,11 +69,6 @@ export const MessagesContainer = ({
 
 	const lastMessage = messages[messages.length - 1];
 	const isLastMessageUser = lastMessage?.role === "USER";
-	const invalidateMessages = () => {
-		void queryClient.invalidateQueries(
-			trpc.messages.getMany.queryOptions({ projectId }),
-		);
-	};
 
 	// Start streaming response if last message is from user and we aren't already streaming a response
 	// This occurs when we type a chat prompt from the home page it'll trigger this and start streaming the response immediately when we navigate to the project page
@@ -208,37 +202,22 @@ export const MessagesContainer = ({
 		<div className="flex flex-col flex-1 min-h-0">
 			<div className="flex-1 min-h-0 overflow-y-auto">
 				<div className="pt-2 pr-1">
-					{messages.map((message) => {
-						const clarificationRuns = message.pendingRuns.filter(
-							(pendingRun) => pendingRun.status === "clarification_required",
-						);
-
-						return (
-							<ReactFragment key={message.id}>
-								<MessageCard
-									content={message.content}
-									role={message.role}
-									fragment={message.fragment}
-									createdAt={message.createdAt}
-									isActiveFragment={
-										!!activeFragment &&
-										!!message.fragment &&
-										activeFragment.id === message.fragment.id
-									}
-									onFragmentClick={() => onUserSelectFragment(message.fragment)}
-									type={message.type}
-								/>
-								{clarificationRuns.map((pendingRun) => (
-									<ClarificationCard
-										key={pendingRun.id}
-										pendingRun={pendingRun}
-										onClarified={invalidateMessages}
-										onCancelled={invalidateMessages}
-									/>
-								))}
-							</ReactFragment>
-						);
-					})}
+					{messages.map((message) => (
+						<MessageCard
+							key={message.id}
+							content={message.content}
+							role={message.role}
+							fragment={message.fragment}
+							createdAt={message.createdAt}
+							isActiveFragment={
+								!!activeFragment &&
+								!!message.fragment &&
+								activeFragment.id === message.fragment.id
+							}
+							onFragmentClick={() => onUserSelectFragment(message.fragment)}
+							type={message.type}
+						/>
+					))}
 					{streamingMessage && (
 						<MessageCard
 							content={streamingMessage.content}
