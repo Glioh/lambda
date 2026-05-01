@@ -56,13 +56,14 @@ export const MessageForm = ({
 		},
 	});
 
+	// Simply create the object so we can use it to mutate later
 	const confirmRun = useMutation(trpc.routing.confirmRun.mutationOptions());
+	//
 
 	const createMessage = useMutation(
 		trpc.messages.create.mutationOptions({
 			onSuccess: async (message, variables) => {
 				form.reset();
-
 				// Fire-and-forget for usage — not on critical path
 				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
 
@@ -84,13 +85,11 @@ export const MessageForm = ({
 						});
 
 						await queryClient.invalidateQueries(
-							trpc.messages.getMany.queryOptions({ projectId }),
+							trpc.messages.getMany.queryOptions({ projectId }), // update again because pending run confirmation can update message status
 						);
 					} catch (error) {
 						const errorMessage =
-							error instanceof Error
-								? error.message
-								: "Unable to start build.";
+							error instanceof Error ? error.message : "Unable to start build.";
 
 						toast.error(errorMessage);
 					}
