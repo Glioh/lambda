@@ -190,6 +190,20 @@ export const routingRouter = createTRPCRouter({
 				});
 			}
 
+			if (pendingRun.status === "running") {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "run already running; cannot cancel",
+				});
+			}
+
+			if (pendingRun.status === "success" || pendingRun.status === "failed") {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "run already completed; cannot cancel",
+				});
+			}
+
 			if (pendingRun.status === "confirmed") {
 				throw new TRPCError({
 					code: "BAD_REQUEST",

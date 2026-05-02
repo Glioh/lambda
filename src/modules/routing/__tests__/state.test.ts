@@ -11,6 +11,9 @@ type PendingRunRow = {
 	status: PendingRunStatus;
 	draftValue: string;
 	dispatchedAt?: Date;
+	startedAt?: Date;
+	completedAt?: Date;
+	errorSummary?: string;
 	cancelledAt?: Date;
 };
 
@@ -98,8 +101,94 @@ describe("pending run state helpers", () => {
 
 		const result = isTerminal(row.status) ? row : null;
 
-		assert.equal(result, row);
-		assert.deepEqual(STATE_TRANSITIONS.dispatched, []);
+		assert.equal(result, null);
+		assert.deepEqual(STATE_TRANSITIONS.dispatched, ["running"]);
+	});
+
+	it("dispatched -> running transition succeeds", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "dispatched", draftValue: "build it" },
+		]);
+
+		const startedAt = new Date();
+		const running = await guardedTransition(
+			prisma,
+			"run-1",
+			"dispatched",
+			"running",
+			{ startedAt },
+		);
+
+		assert.equal(running?.status, "running");
+		assert.equal(running?.startedAt, startedAt);
+	});
+
+	it("running -> success transition succeeds", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "running", draftValue: "build it" },
+		]);
+
+		const completedAt = new Date();
+		const success = await guardedTransition(
+			prisma,
+			"run-1",
+			"running",
+			"success",
+			{ completedAt },
+		);
+
+		assert.equal(success?.status, "success");
+		assert.equal(success?.completedAt, completedAt);
+	});
+
+	it("running -> failed transition succeeds", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "running", draftValue: "build it" },
+		]);
+
+		const completedAt = new Date();
+		const failed = await guardedTransition(
+			prisma,
+			"run-1",
+			"running",
+			"failed",
+			{ completedAt, errorSummary: "sandbox failed" },
+		);
+
+		assert.equal(failed?.status, "failed");
+		assert.equal(failed?.completedAt, completedAt);
+		assert.equal(failed?.errorSummary, "sandbox failed");
+	});
+
+	it("isTerminal returns true only for completed and cancelled runs", () => {
+		assert.equal(isTerminal("success"), true);
+		assert.equal(isTerminal("failed"), true);
+		assert.equal(isTerminal("cancelled"), true);
+		assert.equal(isTerminal("dispatched"), false);
+	});
+
+	it("duplicate dispatched -> running is blocked", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "dispatched", draftValue: "build it" },
+		]);
+
+		const first = await guardedTransition(
+			prisma,
+			"run-1",
+			"dispatched",
+			"running",
+			{ startedAt: new Date() },
+		);
+		const second = await transition(
+			prisma,
+			"run-1",
+			"dispatched",
+			"running",
+			{ startedAt: new Date() },
+		);
+
+		assert.equal(first?.status, "running");
+		assert.equal(second, null);
 	});
 
 	it("cancelRun on confirmed is rejected (BAD_REQUEST)", () => {

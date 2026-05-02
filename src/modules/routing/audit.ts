@@ -8,7 +8,10 @@ export type RoutingAuditAction =
 	| "edit_draft"
 	| "confirm"
 	| "cancel"
-	| "dispatch";
+	| "dispatch"
+	| "start"
+	| "success"
+	| "fail";
 
 type PrismaLike<TRow = unknown> = {
 	routingAuditLog: {

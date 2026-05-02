@@ -18,15 +18,54 @@ import z from "zod";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "@/prompt";
 import { prisma } from "@/lib/db";
 import { SANDBOX_TIMEOUT } from "./types";
+import { transition } from "@/modules/routing/state";
+import { logAuditEvent } from "@/modules/routing/audit";
 
 interface AgentState {
 	summary: string;
 	files: { [path: string]: string };
 }
 
+function getErrorSummary(error: unknown): string {
+	if (error instanceof Error) {
+		return error.message.slice(0, 500);
+	}
+
+	return String(error).slice(0, 500);
+}
+
 export const codeAgentFunction = inngest.createFunction(
 	{ id: "code-agent", triggers: [{ event: "code-agent/run" }] },
 	async ({ event, step }) => {
+		try {
+			if (event.data.pendingRunId) {
+				const runningRun = await step.run("mark-run-running", async () => {
+					const updated = await transition(
+						prisma,
+						event.data.pendingRunId,
+						"dispatched",
+						"running",
+						{
+							startedAt: new Date(),
+						},
+					);
+
+					if (updated) {
+						await logAuditEvent(prisma, {
+							pendingRunId: event.data.pendingRunId,
+							action: "start",
+							actor: "system",
+						});
+					}
+
+					return updated;
+				});
+
+				if (!runningRun) {
+					return;
+				}
+			}
+
 		const sandboxId = await step.run("get-sandbox-id", async () => {
 			const sandbox = await Sandbox.create("lambda");
 			await sandbox.setTimeout(SANDBOX_TIMEOUT);
@@ -276,11 +315,68 @@ export const codeAgentFunction = inngest.createFunction(
 			});
 		});
 
+		if (event.data.pendingRunId) {
+			await step.run("mark-run-success", async () => {
+				const updated = await transition(
+					prisma,
+					event.data.pendingRunId,
+					"running",
+					"success",
+					{
+						completedAt: new Date(),
+					},
+				);
+
+				if (updated) {
+					await logAuditEvent(prisma, {
+						pendingRunId: event.data.pendingRunId,
+						action: "success",
+						actor: "system",
+					});
+				}
+
+				return updated;
+			});
+		}
+
 		return {
 			url: sandboxUrl,
 			title: parseAgentOutput(fragmentTitleOutput),
 			files: result.state.data.files,
 			summary: result.state.data.summary,
 		};
+		} catch (error) {
+			if (event.data.pendingRunId) {
+				const errorSummary = getErrorSummary(error);
+
+				await step.run("mark-run-failed", async () => {
+					const updated = await transition(
+						prisma,
+						event.data.pendingRunId,
+						"running",
+						"failed",
+						{
+							completedAt: new Date(),
+							errorSummary,
+						},
+					);
+
+					if (updated) {
+						await logAuditEvent(prisma, {
+							pendingRunId: event.data.pendingRunId,
+							action: "fail",
+							actor: "system",
+							payload: {
+								errorSummary,
+							},
+						});
+					}
+
+					return updated;
+				});
+			}
+
+			throw error;
+		}
 	},
 );
