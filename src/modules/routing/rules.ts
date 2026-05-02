@@ -1,6 +1,8 @@
 export interface RoutingRules {
 	structuredBuildPatterns: RegExp[];
 	fencedJsonSpecPattern: RegExp;
+	followUpModificationPatterns: RegExp[];
+	clearChatIntentPatterns: RegExp[];
 }
 
 export const ROUTING_RULES: RoutingRules = {
@@ -22,6 +24,37 @@ export const ROUTING_RULES: RoutingRules = {
 	],
 	fencedJsonSpecPattern:
 		/```json\s*[\s\S]*\b(spec|requirements)\b[\s\S]*```/i,
+
+	followUpModificationPatterns: [
+		// "make/change/update it/that/this" — modification verb + pronoun
+		/\b(?:make|change|update|modify|edit|adjust|tweak|fix|improve)\s+(?:it|that|this)\b/i,
+
+		// Color/style/size swap: "make it red", "change to dark mode"
+		/\b(?:make|change|switch|turn|set)\b[\s\S]{0,30}?\b(?:red|blue|green|yellow|purple|pink|orange|white|black|dark(?:\s*mode)?|light(?:\s*mode)?|bigger|smaller|larger|rounded|bold|italic|transparent)\b/i,
+
+		// "add/remove/move/replace the X" — structural change to existing UI
+		/\b(?:add|remove|delete|move|swap|replace|resize|center|align|hide|show|reorder)\s+(?:the|a|an|some)\s+\w+/i,
+
+		// "Can you [modification verb]" — polite modification request
+		/\b(?:can\s+(?:you|u)\s+(?:(?:please|just)\s+)?(?:make|change|update|add|remove|fix|move|swap|replace))\b/i,
+
+		// Referring to specific UI elements from prior build
+		/\b(?:the\s+(?:header|footer|navbar?|sidebar|button|form|input|card|modal|menu|title|text|image|logo|background|layout|section|hero|banner|page|link|icon|font|color|style|border|padding|margin))\b/i,
+
+		// "use X instead" / "try X instead"
+		/\b(?:use|try|go\s+with)\b[\s\S]{0,30}?\b(?:instead|rather)\b/i,
+
+		// Short imperative at start: "now make...", "also add..."
+		/^\s*(?:now\s+|also\s+)?(?:make|change|update|add|remove|fix|move|try|use|put|set)\s/i,
+	],
+
+	clearChatIntentPatterns: [
+		// Conceptual questions — not modifying anything
+		/\b(?:what\s+(?:is|are|does)|explain(?:\s+to\s+me)?|how\s+(?:does|do|is|are)\s+\w+\s+work|why\s+(?:does|do|is|are)|tell\s+me\s+about|what(?:'s|\s+is)\s+the\s+difference)\b/i,
+
+		// Pure greetings / thanks (entire message)
+		/^\s*(?:hi|hello|hey|thanks?|thank\s+you|good\s+(?:morning|afternoon|evening))\s*[.!?]*\s*$/i,
+	],
 };
 
 export function isStructuredBuildIntent(
@@ -32,4 +65,20 @@ export function isStructuredBuildIntent(
 		rules.structuredBuildPatterns.some((pattern) => pattern.test(value)) ||
 		rules.fencedJsonSpecPattern.test(value)
 	);
+}
+
+export function isFollowUpModification(
+	value: string,
+	rules: typeof ROUTING_RULES,
+): boolean {
+	return rules.followUpModificationPatterns.some((pattern) =>
+		pattern.test(value),
+	);
+}
+
+export function isClearChatIntent(
+	value: string,
+	rules: typeof ROUTING_RULES,
+): boolean {
+	return rules.clearChatIntentPatterns.some((pattern) => pattern.test(value));
 }

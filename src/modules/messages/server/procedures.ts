@@ -69,10 +69,23 @@ export const messagesRouter = createTRPCRouter({
 				},
 			});
 
+			const [fragmentCount, buildRunCount] = await Promise.all([
+				prisma.fragment.count({
+					where: { message: { projectId: existingProject.id } },
+				}),
+				prisma.pendingRun.count({
+					where: {
+						projectId: existingProject.id,
+						status: { in: ["dispatched", "confirmed"] },
+					},
+				}),
+			]);
+
 			const decision = decideRoute({
 				value: input.value,
 				routing: input.routing,
 				projectId: existingProject.id,
+				hasPriorBuild: fragmentCount > 0 || buildRunCount > 0,
 			});
 
 			if (decision.decision === "chat") {
