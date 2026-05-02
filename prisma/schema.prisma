@@ -71,7 +71,6 @@ model Usage {
 }
 
 enum PendingRunStatus {
-  clarification_required
   waiting_confirmation
   confirmed
   dispatched
@@ -82,7 +81,6 @@ model PendingRun {
   id String @id @default(uuid())
   status PendingRunStatus @default(waiting_confirmation)
   draftValue String
-  clarificationPrompt String?
   dispatchedAt DateTime?
   cancelledAt DateTime?
   createdAt DateTime @default(now())

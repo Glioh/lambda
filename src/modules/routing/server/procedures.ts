@@ -54,7 +54,7 @@ async function getOwnedPendingRun(pendingRunId: string, userId: string) {
  * @param {string} [draftValue] - Optional draft value to update before confirming.
  * @param {boolean} [retried=false] - Internal retry flag to prevent infinite loops.
  * @returns {Promise<PendingRun>} The dispatched pending run.
- * @throws {TRPCError} If run is cancelled, already dispatched, or clarification is required.
+ * @throws {TRPCError} If run is cancelled or already dispatched.
  */
 async function confirmPendingRun(
 	pendingRunId: string,
@@ -72,13 +72,6 @@ async function confirmPendingRun(
 		throw new TRPCError({
 			code: "BAD_REQUEST",
 			message: "run already cancelled",
-		});
-	}
-
-	if (pendingRun.status === "clarification_required") {
-		throw new TRPCError({
-			code: "BAD_REQUEST",
-			message: "clarification required",
 		});
 	}
 
@@ -156,84 +149,6 @@ async function confirmPendingRun(
 }
 
 export const routingRouter = createTRPCRouter({
-	/**
-	 * Mutation to request clarification or edit draft for a pending run.
-	 * Allows users to transition from clarification_required → waiting_confirmation,
-	 * or update draft while in waiting_confirmation state.
-	 */
-	requestClarification: protectedProcedure // get clarification endpoint
-		.input(
-			pendingRunInput.extend({
-				draftValue: z.string().optional(),
-				clarificationPrompt: z.string().min(1, {
-					message: "Clarification prompt is required.",
-				}),
-			}),
-		)
-		.mutation(async ({ input, ctx }) => {
-			const pendingRun = await getOwnedPendingRun(
-				input.pendingRunId,
-				ctx.auth.userId,
-			);
-			const patch = {
-				...(input.draftValue === undefined // provide user entered clarification as draft value
-					? {}
-					: {
-							draftValue: input.draftValue,
-						}),
-				clarificationPrompt: input.clarificationPrompt, // the thing the AI is asking for clarification about
-			};
-
-			if (pendingRun.status === "clarification_required") {
-				const updated = await transition(
-					prisma,
-					pendingRun.id,
-					"clarification_required",
-					"waiting_confirmation",
-					patch,
-				);
-
-				if (!updated) {
-					throw new TRPCError({
-						code: "CONFLICT",
-						message: "Pending run changed while requesting clarification.",
-					});
-				}
-
-				await logAuditEvent(prisma, {
-					pendingRunId: updated.id,
-					action: "request_clarification",
-					actor: ctx.auth.userId,
-					payload: patch,
-				});
-
-				return updated;
-			}
-
-			if (pendingRun.status === "waiting_confirmation") {
-				const updated = await prisma.pendingRun.update({
-					where: {
-						id: pendingRun.id,
-					},
-					data: patch,
-				});
-
-				await logAuditEvent(prisma, {
-					pendingRunId: updated.id,
-					action: "edit_draft",
-					actor: ctx.auth.userId,
-					payload: patch,
-				});
-
-				return updated;
-			}
-
-			throw new TRPCError({
-				code: "BAD_REQUEST",
-				message: `Cannot request clarification for pending run with status ${pendingRun.status}.`,
-			});
-		}),
-
 	/**
 	 * Mutation to confirm a pending run and dispatch it to the code agent.
 	 * Orchestrates the full confirmation and dispatch workflow.

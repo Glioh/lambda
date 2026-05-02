@@ -16,6 +16,10 @@ import { useRouter } from "next/navigation";
 interface Props {
 	projectId: string;
 	onSendStart?: () => void;
+	onChatStreamStart?: () => void;
+	onChatStreamToken?: (token: string) => void;
+	onChatStreamEnd?: () => void;
+	onChatStreamError?: (message: string) => void;
 }
 
 const formSchema = z.object({
@@ -26,7 +30,19 @@ const formSchema = z.object({
 		.max(10000, "Prompt is too long"),
 });
 
-export const MessageForm = ({ projectId, onSendStart }: Props) => {
+/**
+ * Renders the message composer and streams chat responses back into the UI.
+ * @param {Props} props - The message form props.
+ * @returns {JSX.Element} The rendered message composer.
+ */
+export const MessageForm = ({
+	projectId,
+	onSendStart,
+	onChatStreamStart,
+	onChatStreamToken,
+	onChatStreamEnd,
+	onChatStreamError,
+}: Props) => {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
@@ -40,14 +56,64 @@ export const MessageForm = ({ projectId, onSendStart }: Props) => {
 		},
 	});
 
+	// Simply create the object so we can use it to mutate later
+	const confirmRun = useMutation(trpc.routing.confirmRun.mutationOptions());
+	//
+
 	const createMessage = useMutation(
 		trpc.messages.create.mutationOptions({
-			onSuccess: () => {
+			onSuccess: async (message, variables) => {
 				form.reset();
+				// Fire-and-forget for usage — not on critical path
+				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+
+				if (message.routing.decision !== "chat") {
+					// Build path: await invalidation since we need fresh data before confirmRun
+					await queryClient.invalidateQueries(
+						trpc.messages.getMany.queryOptions({ projectId }),
+					);
+
+					if (!message.pendingRunId) {
+						toast.error("Unable to start build.");
+						return;
+					}
+
+					try {
+						await confirmRun.mutateAsync({
+							pendingRunId: message.pendingRunId,
+							draftValue: variables.value,
+						});
+
+						await queryClient.invalidateQueries(
+							trpc.messages.getMany.queryOptions({ projectId }), // update again because pending run confirmation can update message status
+						);
+					} catch (error) {
+						const errorMessage =
+							error instanceof Error ? error.message : "Unable to start build.";
+
+						toast.error(errorMessage);
+					}
+
+					return;
+				}
+
+				// Chat path: don't block stream on message list refresh
+				// The 1.5s poll interval will pick up the new message
 				queryClient.invalidateQueries(
 					trpc.messages.getMany.queryOptions({ projectId }),
 				);
-				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+
+				try {
+					await streamChatResponse(variables.value);
+				} catch (error) {
+					const errorMessage =
+						error instanceof Error
+							? error.message
+							: "Something went wrong. Please try again.";
+
+					onChatStreamError?.(errorMessage);
+					toast.error(errorMessage);
+				}
 			},
 			onError: (error) => {
 				toast.error(error.message);
@@ -59,6 +125,92 @@ export const MessageForm = ({ projectId, onSendStart }: Props) => {
 		}),
 	);
 
+	/**
+	 * Starts the chat stream and forwards incoming tokens to the parent.
+	 * @param {string} value - The submitted user prompt.
+	 * @returns {Promise<void>} A promise that resolves when streaming ends.
+	 */
+	const streamChatResponse = async (value: string) => {
+		onChatStreamStart?.();
+
+		const response = await fetch("/api/chat", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({
+				value,
+				projectId,
+			}),
+		});
+
+		if (!response.ok || !response.body) {
+			throw new Error("Unable to start chat response.");
+		}
+
+		const reader = response.body.getReader();
+		const decoder = new TextDecoder();
+		let buffer = "";
+
+		while (true) {
+			const { value: chunk, done } = await reader.read();
+
+			if (done) {
+				break;
+			}
+
+			buffer += decoder.decode(chunk, { stream: true });
+			const events = buffer.split("\n\n");
+			buffer = events.pop() ?? "";
+
+			for (const event of events) {
+				const lines = event.split("\n");
+				const eventName =
+					lines
+						.find((line) => line.startsWith("event: "))
+						?.slice("event: ".length) ?? "message";
+				const data = lines
+					.find((line) => line.startsWith("data: "))
+					?.slice("data: ".length);
+
+				if (!data) {
+					continue;
+				}
+
+				if (data === "[DONE]") {
+					await queryClient.invalidateQueries(
+						trpc.messages.getMany.queryOptions({ projectId }),
+					);
+
+					onChatStreamEnd?.();
+					return;
+				}
+
+				const parsed = JSON.parse(data) as { token?: string; error?: string };
+
+				if (eventName === "error") {
+					onChatStreamError?.(
+						parsed.error ?? "Something went wrong. Please try again.",
+					);
+					continue;
+				}
+
+				if (eventName === "status") {
+					continue;
+				}
+
+				if (parsed.token) {
+					onChatStreamToken?.(parsed.token);
+				}
+			}
+		}
+	};
+
+	/**
+	 * Submits the current form value to the server.
+	 * @param {z.infer<typeof formSchema>} values - The validated form values.
+	 * @returns {void} This handler submits the message mutation.
+	 */
 	const onSubmit = (values: z.infer<typeof formSchema>) => {
 		onSendStart?.();
 		createMessage.mutate({
@@ -71,7 +223,7 @@ export const MessageForm = ({ projectId, onSendStart }: Props) => {
 
 	const [isFocused, setIsFocused] = React.useState(false);
 	const showUsage = !!usage && usage.remainingPoints <= LOW_CREDITS_THRESHOLD;
-	const isPending = createMessage.isPending;
+	const isPending = createMessage.isPending || confirmRun.isPending;
 	const isButtonDisabled = isPending || !form.formState.isValid;
 
 	return (

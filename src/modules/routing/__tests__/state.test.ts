@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Prisma, type PendingRunStatus } from "@prisma/client";
-import { isTerminal, STATE_TRANSITIONS, transition } from "../state";
+
+const { isTerminal, STATE_TRANSITIONS, transition } = (await import(
+	new URL("../state.ts", import.meta.url).href
+)) as typeof import("../state");
 
 type PendingRunRow = {
 	id: string;
@@ -47,7 +50,7 @@ function createFakePrisma(rows: PendingRunRow[]) {
 }
 
 function assertAllowed(from: PendingRunStatus, to: PendingRunStatus) {
-	if (!STATE_TRANSITIONS[from].includes(to)) {
+	if (!(STATE_TRANSITIONS[from] ?? []).includes(to)) {
 		throw new Error(`BAD_REQUEST: cannot transition ${from} to ${to}`);
 	}
 }
@@ -143,22 +146,4 @@ describe("pending run state helpers", () => {
 		assert.equal(cancelled, null);
 	});
 
-	it("clarification_required -> cancelled allowed", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "clarification_required", draftValue: "build it" },
-		]);
-
-		const cancelled = await guardedTransition(
-			prisma,
-			"run-1",
-			"clarification_required",
-			"cancelled",
-		);
-
-		assert.equal(cancelled?.status, "cancelled");
-	});
-
-	it("clarification_required -> confirmed is rejected via STATE_TRANSITIONS lookup", () => {
-		assert.throws(() => assertAllowed("clarification_required", "confirmed"), /BAD_REQUEST/);
-	});
 });

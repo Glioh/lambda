@@ -1,13 +1,23 @@
 import { createHash } from "node:crypto";
-import { ROUTING_RULES, isStructuredBuildIntent } from "./rules";
+import {
+	ROUTING_RULES,
+	isStructuredBuildIntent,
+	isFollowUpModification,
+	isClearChatIntent,
+} from "./rules";
 import type { RoutingDecision, RoutingInput } from "./types";
 
-type RuleHit = "explicit_build" | "structured_build" | "fallback";
+type RuleHit =
+	| "explicit_build"
+	| "structured_build"
+	| "follow_up_build"
+	| "fallback";
 
 interface DecideRouteInput {
 	value: string;
 	routing?: RoutingInput;
 	projectId?: string;
+	hasPriorBuild?: boolean;
 }
 
 export function decideRoute(
@@ -29,6 +39,19 @@ export function decideRoute(
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "high",
+			requiresConfirmation: true,
+		});
+	}
+
+	if (
+		input.hasPriorBuild &&
+		isFollowUpModification(input.value, ROUTING_RULES) &&
+		!isClearChatIntent(input.value, ROUTING_RULES)
+	) {
+		return logAndReturn(input, logger, "follow_up_build", {
+			decision: "build",
+			decisionSource: "auto",
+			confidence: "medium",
 			requiresConfirmation: true,
 		});
 	}

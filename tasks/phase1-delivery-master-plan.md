@@ -227,11 +227,13 @@ User Input
 
 ---
 
-### Ticket P1-3: Clarification and Confirmation Gate
+### Ticket P1-3: Clarification and Confirmation Gate (Server)
 **Outcome**: Build flow cannot start until user confirms; underspecified requests trigger clarification.
 
+**Status**: ✅ Done (Issue #20)
+
 **Scope**
-- Pre-execution state transitions and UI contract.
+- Pre-execution state transitions and endpoint contracts.
 
 **Implementation Tasks**
 1. Define pre-run states:
@@ -246,8 +248,8 @@ User Input
 5. Add audit log entries for confirmation actions.
 
 **Deliverables**
-- Confirmation/clarification handlers.
-- State transition table.
+- Confirmation/clarification handlers (`src/modules/routing/server/procedures.ts`).
+- State transition table (`src/modules/routing/state.ts`).
 
 **Dependencies**: P1-2
 
@@ -261,10 +263,44 @@ User Input
 
 ---
 
+### Ticket P1-3b: Clarification UI - Thread-side Rendering and Form
+**Outcome**: Users see and respond to clarification prompts in the chat thread.
+
+**Scope**
+- UI components + query extension to display pending runs and clarification forms.
+
+**Implementation Tasks**
+1. Extend `messages.getMany` query to include `pendingRuns`.
+2. Create `ClarificationCard` component with textarea + submit/cancel buttons.
+3. Render clarification card in `MessagesContainer` for `clarification_required` runs.
+4. Wire form submission to `trpc.routing.requestClarification`.
+5. Handle loading/error states and refresh messages on success.
+
+**Deliverables**
+- Updated `src/modules/messages/server/procedures.ts` (include pendingRuns).
+- New `src/modules/projects/ui/components/clarification-card.tsx`.
+- Updated `src/modules/projects/ui/components/messages-container.tsx` (render clarification card).
+
+**Dependencies**: P1-3
+
+**Acceptance Criteria**
+- Clarification card displays when message has `clarification_required` pending run.
+- User can submit answer via textarea.
+- Submission transitions run to `waiting_confirmation` and refreshes thread.
+- Error handling via toasts.
+- Cancel button cancels run safely.
+
+**Validation**
+- E2E test: user sees clarification prompt, submits answer, run transitions.
+
+---
+
 ## Phase 2: Execution Path Split
 
 ### Ticket P2-1: Synchronous Chat Pipeline with Streaming
 **Outcome**: Chat responses are fast, streaming, and independent of worker queue.
+
+**Status**: ✅ Done (Issue #25)
 
 **Scope**
 - Build new synchronous chat path used when router decides chat.
@@ -617,20 +653,22 @@ User Input
 3. P1-1
 4. P1-2
 5. P1-3
-6. P2-1
-7. P2-2
-8. P3-1
-9. P3-2
-10. P2-3
-11. P3-3
-12. P4-1
-13. P4-2
-14. P5-1
-15. P5-2
-16. P5-3
+6. **P1-3b** (new: UI for clarification)
+7. P2-1
+8. P2-2
+9. P3-1
+10. P3-2
+11. P2-3
+12. P3-3
+13. P4-1
+14. P4-2
+15. P5-1
+16. P5-2
+17. P5-3
 
 ### Safe Parallelization Opportunities
-- P2-1 and P3-1 can overlap after P1-3 if write scopes are separated.
+- P1-3b can run in parallel with P2-1 after P1-3 is complete (independent UI and sync-chat paths).
+- P2-1 and P3-1 can overlap after P1-3b if write scopes are separated.
 - P4-1 can begin once P2-1 has a stable context API.
 - P5-1 logging scaffolding can begin early but finalize after router/run state contracts stabilize.
 
@@ -650,4 +688,3 @@ User Input
 - Artifacts are canonical in dedicated storage with immutable versioning.
 - Observability and budget controls are active.
 - Rollout is flaggable and reversible.
-

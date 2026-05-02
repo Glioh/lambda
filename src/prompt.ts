@@ -7,6 +7,12 @@ Your message should be 1 to 3 sentences, describing what the app does or what wa
 Do not add code, tags, or metadata. Only return the plain text response.
 `;
 
+export const CHAT_PROMPT = `
+You are a helpful assistant for a UI code generation app called Lambda.
+Answer questions about UI, React, Next.js, and general coding topics.
+Be concise, practical, and helpful.
+`;
+
 export const FRAGMENT_TITLE_PROMPT = `
 You are an assistant that generates a short, descriptive title for a code fragment based on its <task_summary>.
 The title should be:
