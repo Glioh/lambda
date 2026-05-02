@@ -43,11 +43,11 @@ export const ProjectForm = () => {
 				queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
 
 				if (data.routing.decision !== "chat") {
-					// Build path: confirm the pending run to dispatch the Inngest job
-					if (data.pendingRunId) {
+					// Build path: confirm the run to dispatch the Inngest job
+					if (data.runId) {
 						try {
 							await confirmRun.mutateAsync({
-								pendingRunId: data.pendingRunId,
+								runId: data.runId,
 							});
 						} catch (error) {
 							const errorMessage =

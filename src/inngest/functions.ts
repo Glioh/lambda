@@ -38,11 +38,11 @@ export const codeAgentFunction = inngest.createFunction(
 	{ id: "code-agent", triggers: [{ event: "code-agent/run" }] },
 	async ({ event, step }) => {
 		try {
-			if (event.data.pendingRunId) {
+			if (event.data.runId) {
 				const runningRun = await step.run("mark-run-running", async () => {
 					const updated = await transition(
 						prisma,
-						event.data.pendingRunId,
+						event.data.runId,
 						"dispatched",
 						"running",
 						{
@@ -52,7 +52,7 @@ export const codeAgentFunction = inngest.createFunction(
 
 					if (updated) {
 						await logAuditEvent(prisma, {
-							pendingRunId: event.data.pendingRunId,
+							runId: event.data.runId,
 							action: "start",
 							actor: "system",
 						});
@@ -315,11 +315,11 @@ export const codeAgentFunction = inngest.createFunction(
 			});
 		});
 
-		if (event.data.pendingRunId) {
+		if (event.data.runId) {
 			await step.run("mark-run-success", async () => {
 				const updated = await transition(
 					prisma,
-					event.data.pendingRunId,
+					event.data.runId,
 					"running",
 					"success",
 					{
@@ -329,7 +329,7 @@ export const codeAgentFunction = inngest.createFunction(
 
 				if (updated) {
 					await logAuditEvent(prisma, {
-						pendingRunId: event.data.pendingRunId,
+						runId: event.data.runId,
 						action: "success",
 						actor: "system",
 					});
@@ -346,13 +346,13 @@ export const codeAgentFunction = inngest.createFunction(
 			summary: result.state.data.summary,
 		};
 		} catch (error) {
-			if (event.data.pendingRunId) {
+			if (event.data.runId) {
 				const errorSummary = getErrorSummary(error);
 
 				await step.run("mark-run-failed", async () => {
 					const updated = await transition(
 						prisma,
-						event.data.pendingRunId,
+						event.data.runId,
 						"running",
 						"failed",
 						{
@@ -363,7 +363,7 @@ export const codeAgentFunction = inngest.createFunction(
 
 					if (updated) {
 						await logAuditEvent(prisma, {
-							pendingRunId: event.data.pendingRunId,
+							runId: event.data.runId,
 							action: "fail",
 							actor: "system",
 							payload: {

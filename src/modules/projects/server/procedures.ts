@@ -85,11 +85,11 @@ export const projectsRouter = createTRPCRouter({
 
 			if (decision.decision === "chat") {
 				// TODO(P5-2): split chat budget — credits currently consumed via usageProtectedProcedure even on chat path
-				return { ...createdProject, routing: decision, pendingRunId: null };
+				return { ...createdProject, routing: decision, runId: null };
 			}
 
-			// By this point we know the decision is to build so we can create a pending run in our db
-			const pendingRun = await prisma.pendingRun.create({
+			// By this point we know the decision is to build so we can create a run in our db
+			const run = await prisma.run.create({
 				data: {
 					status: "waiting_confirmation",
 					draftValue: input.value,
@@ -99,7 +99,7 @@ export const projectsRouter = createTRPCRouter({
 			});
 
 			await logAuditEvent(prisma, {
-				pendingRunId: pendingRun.id,
+				runId: run.id,
 				action: "create",
 				actor: ctx.auth.userId,
 				payload: { decision },
@@ -108,7 +108,7 @@ export const projectsRouter = createTRPCRouter({
 			return {
 				...createdProject,
 				routing: decision,
-				pendingRunId: pendingRun.id,
+				runId: run.id,
 			};
 		}),
 });

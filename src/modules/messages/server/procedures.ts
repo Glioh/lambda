@@ -73,7 +73,7 @@ export const messagesRouter = createTRPCRouter({
 				prisma.fragment.count({
 					where: { message: { projectId: existingProject.id } },
 				}),
-				prisma.pendingRun.count({
+				prisma.run.count({
 					where: {
 						projectId: existingProject.id,
 						status: { in: ["dispatched", "confirmed"] },
@@ -90,10 +90,10 @@ export const messagesRouter = createTRPCRouter({
 
 			if (decision.decision === "chat") {
 				// TODO(P5-2): split chat budget — credits currently consumed via usageProtectedProcedure even on chat path
-				return { ...newMessage, routing: decision, pendingRunId: null };
+				return { ...newMessage, routing: decision, runId: null };
 			}
 
-			const pendingRun = await prisma.pendingRun.create({
+			const run = await prisma.run.create({
 				data: {
 					status: "waiting_confirmation",
 					draftValue: input.value,
@@ -103,12 +103,12 @@ export const messagesRouter = createTRPCRouter({
 			});
 
 			await logAuditEvent(prisma, {
-				pendingRunId: pendingRun.id,
+				runId: run.id,
 				action: "create",
 				actor: ctx.auth.userId,
 				payload: { decision },
 			});
 
-			return { ...newMessage, routing: decision, pendingRunId: pendingRun.id };
+			return { ...newMessage, routing: decision, runId: run.id };
 		}),
 });

@@ -21,7 +21,8 @@ model Project {
   updatedAt DateTime @updatedAt
 
   messages Message[]
-  pendingRuns PendingRun[]
+  runs Run[]
+  artifact Artifact?
 
 }
 
@@ -47,7 +48,7 @@ model Message {
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   fragment Fragment?
-  pendingRuns PendingRun[]
+  runs Run[]
 }
 
 model Fragment {
@@ -70,7 +71,7 @@ model Usage {
   expire DateTime?
 }
 
-enum PendingRunStatus {
+enum RunStatus {
   waiting_confirmation
   confirmed
   dispatched
@@ -80,34 +81,67 @@ enum PendingRunStatus {
   cancelled
 }
 
-model PendingRun {
-  id String @id @default(uuid())
-  status PendingRunStatus @default(waiting_confirmation)
-  draftValue String
-  dispatchedAt DateTime?
-  startedAt DateTime?
-  completedAt DateTime?
-  errorSummary String?
-  cancelledAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  projectId String
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  messageId String?
-  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
-
-  auditLogs RoutingAuditLog[]
+model Run {
+  id                String            @id @default(uuid())
+  status            RunStatus         @default(waiting_confirmation)
+  draftValue        String
+  dispatchedAt      DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  errorSummary      String?
+  cancelledAt       DateTime?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  projectId         String
+  project           Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  messageId         String?
+  message           Message?          @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  auditLogs         RoutingAuditLog[]
+  artifactVersions  ArtifactVersion[]
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
 }
 
 model RoutingAuditLog {
   id String @id @default(uuid())
-  pendingRunId String
-  pendingRun PendingRun @relation(fields: [pendingRunId], references: [id], onDelete: Cascade)
+  runId String
+  run Run @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   action String
   actor String
   payload Json?
   createdAt DateTime @default(now())
+}
+
+model Artifact {
+  id        String   @id @default(uuid())
+  projectId String   @unique
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  versions  ArtifactVersion[]
+}
+
+model ArtifactVersion {
+  id         String   @id @default(uuid())
+  version    Int
+  artifactId String
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  runId      String
+  run        Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  sandboxUrl String?
+  title      String?
+  createdAt  DateTime @default(now())
+  files      ArtifactFile[]
+  @@unique([artifactId, version])
+  @@index([artifactId, createdAt])
+}
+
+model ArtifactFile {
+  id                String          @id @default(uuid())
+  artifactVersionId String
+  artifactVersion   ArtifactVersion @relation(fields: [artifactVersionId], references: [id], onDelete: Cascade)
+  path              String
+  content           String
+  @@unique([artifactVersionId, path])
 }

@@ -1,20 +1,20 @@
-import { Prisma, type PendingRunStatus } from "@prisma/client";
+import { Prisma, type RunStatus } from "@prisma/client";
 
-type PendingRunUpdateArgs = {
+type RunUpdateArgs = {
 	where: {
 		id: string;
-		status?: PendingRunStatus;
+		status?: RunStatus;
 	};
-	data: Prisma.PendingRunUpdateInput;
+	data: Prisma.RunUpdateInput;
 };
 
 type PrismaLike<TRow = unknown> = { // wrap prisma type to avoid importing the entire PrismaClient type we can now pass in tests
-	pendingRun: { // takes args PendingRunUpdateArgs and returns a promise of TRow
-		update: (args: PendingRunUpdateArgs) => Promise<TRow>;
+	run: { // takes args RunUpdateArgs and returns a promise of TRow
+		update: (args: RunUpdateArgs) => Promise<TRow>;
 	};
 };
 
-export const STATE_TRANSITIONS: Record<PendingRunStatus, PendingRunStatus[]> = {
+export const STATE_TRANSITIONS: Record<RunStatus, RunStatus[]> = {
 	waiting_confirmation: ["confirmed", "cancelled"],
 	confirmed: ["dispatched"],
 	dispatched: ["running"],
@@ -25,36 +25,36 @@ export const STATE_TRANSITIONS: Record<PendingRunStatus, PendingRunStatus[]> = {
 };
 
 /**
- * Checks whether a pending run status is final.
- * @param {PendingRunStatus} status - The status to inspect.
+ * Checks whether a run status is final.
+ * @param {RunStatus} status - The status to inspect.
  * @returns {boolean} True when the status is success, failed, or cancelled.
  */
-export function isTerminal(status: PendingRunStatus): boolean {
+export function isTerminal(status: RunStatus): boolean {
 	return status === "success" || status === "failed" || status === "cancelled";
 }
 
 /**
- * Attempts to transition a pending run from one status to another.
+ * Attempts to transition a run from one status to another.
  * Only updates the row when the current status matches the expected `from` value.
  * Returns `null` when the row no longer matches, such as during a concurrent update.
- * @param {PrismaLike<TRow>} prisma - Prisma-like client with `pendingRun.update`.
- * @param {string} pendingRunId - The pending run ID to update.
- * @param {PendingRunStatus} from - The current expected status.
- * @param {PendingRunStatus} to - The new status to write.
- * @param {Prisma.PendingRunUpdateInput} [patch={}] - Additional fields to update.
+ * @param {PrismaLike<TRow>} prisma - Prisma-like client with `run.update`.
+ * @param {string} runId - The run ID to update.
+ * @param {RunStatus} from - The current expected status.
+ * @param {RunStatus} to - The new status to write.
+ * @param {Prisma.RunUpdateInput} [patch={}] - Additional fields to update.
  * @returns {Promise<TRow | null>} The updated row or `null` if the transition failed.
  */
 export async function transition<TRow>(
 	prisma: PrismaLike<TRow>, 
-	pendingRunId: string,
-	from: PendingRunStatus,
-	to: PendingRunStatus,
-	patch: Prisma.PendingRunUpdateInput = {},
+	runId: string,
+	from: RunStatus,
+	to: RunStatus,
+	patch: Prisma.RunUpdateInput = {},
 ): Promise<TRow | null> {
 	try {
-		return await prisma.pendingRun.update({
+		return await prisma.run.update({
 			where: {
-				id: pendingRunId,
+				id: runId,
 				status: from,
 			},
 			data: {

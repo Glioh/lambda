@@ -1,14 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { Prisma, type PendingRunStatus } from "@prisma/client";
+import { Prisma, type RunStatus } from "@prisma/client";
+import { isTerminal, STATE_TRANSITIONS, transition } from "../state";
 
-const { isTerminal, STATE_TRANSITIONS, transition } = (await import(
-	new URL("../state.ts", import.meta.url).href
-)) as typeof import("../state");
-
-type PendingRunRow = {
+type RunRow = {
 	id: string;
-	status: PendingRunStatus;
+	status: RunStatus;
 	draftValue: string;
 	dispatchedAt?: Date;
 	startedAt?: Date;
@@ -17,34 +14,34 @@ type PendingRunRow = {
 	cancelledAt?: Date;
 };
 
-function createFakePrisma(rows: PendingRunRow[]) {
-	const pendingRuns = new Map(rows.map((row) => [row.id, row]));
+function createFakePrisma(rows: RunRow[]) {
+	const runs = new Map(rows.map((row) => [row.id, row]));
 
 	return {
-		pendingRuns,
+		runs,
 		prisma: {
-			pendingRun: {
+			run: {
 				async update({
 					where,
 					data,
 				}: {
-					where: { id: string; status?: PendingRunStatus };
-					data: Prisma.PendingRunUpdateInput;
+					where: { id: string; status?: RunStatus };
+					data: Prisma.RunUpdateInput;
 				}) {
-					const row = pendingRuns.get(where.id);
+					const row = runs.get(where.id);
 
 					if (!row || (where.status && row.status !== where.status)) {
-						throw Object.assign(new Error("No PendingRun found"), {
+						throw Object.assign(new Error("No Run found"), {
 							code: "P2025",
 						});
 					}
 
 					const next = {
 						...row,
-						...(data as Partial<PendingRunRow>),
+						...(data as Partial<RunRow>),
 					};
 
-					pendingRuns.set(where.id, next);
+					runs.set(where.id, next);
 					return next;
 				},
 			},
@@ -52,7 +49,7 @@ function createFakePrisma(rows: PendingRunRow[]) {
 	};
 }
 
-function assertAllowed(from: PendingRunStatus, to: PendingRunStatus) {
+function assertAllowed(from: RunStatus, to: RunStatus) {
 	if (!(STATE_TRANSITIONS[from] ?? []).includes(to)) {
 		throw new Error(`BAD_REQUEST: cannot transition ${from} to ${to}`);
 	}
@@ -60,16 +57,16 @@ function assertAllowed(from: PendingRunStatus, to: PendingRunStatus) {
 
 async function guardedTransition(
 	fakePrisma: ReturnType<typeof createFakePrisma>["prisma"],
-	pendingRunId: string,
-	from: PendingRunStatus,
-	to: PendingRunStatus,
-	patch: Partial<PendingRunRow> = {},
+	runId: string,
+	from: RunStatus,
+	to: RunStatus,
+	patch: Partial<RunRow> = {},
 ) {
 	assertAllowed(from, to);
-	return transition(fakePrisma, pendingRunId, from, to, patch);
+	return transition(fakePrisma, runId, from, to, patch);
 }
 
-describe("pending run state helpers", () => {
+describe("run state helpers", () => {
 	it("waiting_confirmation -> confirmed -> dispatched ok", async () => {
 		const { prisma } = createFakePrisma([
 			{ id: "run-1", status: "waiting_confirmation", draftValue: "build it" },
@@ -93,7 +90,7 @@ describe("pending run state helpers", () => {
 	});
 
 	it("confirmRun on dispatched is idempotent (no-op)", () => {
-		const row: PendingRunRow = {
+		const row: RunRow = {
 			id: "run-1",
 			status: "dispatched",
 			draftValue: "build it",

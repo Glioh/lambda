@@ -17,7 +17,7 @@ type PrismaLike<TRow = unknown> = {
 	routingAuditLog: {
 		create: (args: {
 			data: {
-				pendingRunId: string;
+				runId: string;
 				action: RoutingAuditAction;
 				actor: string;
 				payload?: Prisma.InputJsonValue;
@@ -27,7 +27,7 @@ type PrismaLike<TRow = unknown> = {
 };
 
 interface LogAuditEventInput {
-	pendingRunId: string;
+	runId: string;
 	action: RoutingAuditAction;
 	actor: string;
 	payload?: unknown;
@@ -41,11 +41,11 @@ interface LogAuditEventInput {
  */
 export async function logAuditEvent<TRow>(
 	prisma: PrismaLike<TRow>,
-	{ pendingRunId, action, actor, payload }: LogAuditEventInput,
+	{ runId, action, actor, payload }: LogAuditEventInput,
 ): Promise<TRow> {
 	return prisma.routingAuditLog.create({
 		data: {
-			pendingRunId,
+			runId,
 			action,
 			actor,
 			...(payload === undefined

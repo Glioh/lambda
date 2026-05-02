@@ -73,19 +73,19 @@ export const MessageForm = ({
 						trpc.messages.getMany.queryOptions({ projectId }),
 					);
 
-					if (!message.pendingRunId) {
+					if (!message.runId) {
 						toast.error("Unable to start build.");
 						return;
 					}
 
 					try {
 						await confirmRun.mutateAsync({
-							pendingRunId: message.pendingRunId,
+							runId: message.runId,
 							draftValue: variables.value,
 						});
 
 						await queryClient.invalidateQueries(
-							trpc.messages.getMany.queryOptions({ projectId }), // update again because pending run confirmation can update message status
+							trpc.messages.getMany.queryOptions({ projectId }), // update again because run confirmation can update message status
 						);
 					} catch (error) {
 						const errorMessage =
