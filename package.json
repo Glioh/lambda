@@ -9,6 +9,7 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint .",
+    "test:artifacts": "node --import tsx --test src/modules/artifacts/__tests__/service.test.ts",
     "test:routing": "node --import tsx --test src/modules/routing/__tests__/router.test.ts src/modules/routing/__tests__/state.test.ts",
     "test:routing-state": "node --import tsx --test src/modules/routing/__tests__/state.test.ts"
   },

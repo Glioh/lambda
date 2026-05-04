@@ -69,9 +69,9 @@ export const messagesRouter = createTRPCRouter({
 				},
 			});
 
-			const [fragmentCount, buildRunCount] = await Promise.all([
-				prisma.fragment.count({
-					where: { message: { projectId: existingProject.id } },
+			const [artifactVersionCount, buildRunCount] = await Promise.all([
+				prisma.artifactVersion.count({
+					where: { artifact: { projectId: existingProject.id } },
 				}),
 				prisma.run.count({
 					where: {
@@ -85,7 +85,7 @@ export const messagesRouter = createTRPCRouter({
 				value: input.value,
 				routing: input.routing,
 				projectId: existingProject.id,
-				hasPriorBuild: fragmentCount > 0 || buildRunCount > 0,
+				hasPriorBuild: artifactVersionCount > 0 || buildRunCount > 0,
 			});
 
 			if (decision.decision === "chat") {

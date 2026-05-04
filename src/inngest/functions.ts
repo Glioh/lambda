@@ -20,6 +20,7 @@ import { prisma } from "@/lib/db";
 import { SANDBOX_TIMEOUT } from "./types";
 import { transition } from "@/modules/routing/state";
 import { logAuditEvent } from "@/modules/routing/audit";
+import { createArtifactVersion } from "@/modules/artifacts/server/service";
 
 interface AgentState {
 	summary: string;
@@ -298,6 +299,16 @@ export const codeAgentFunction = inngest.createFunction(
 				});
 			}
 
+			const artifactVersion = event.data.runId
+				? await createArtifactVersion(prisma, {
+						projectId: event.data.projectId,
+						runId: event.data.runId,
+						sandboxUrl: sandboxUrl,
+						title: parseAgentOutput(fragmentTitleOutput),
+						files: result.state.data.files,
+					})
+				: null;
+
 			return await prisma.message.create({
 				data: {
 					projectId: event.data.projectId,
@@ -308,7 +319,15 @@ export const codeAgentFunction = inngest.createFunction(
 						create: {
 							sandboxUrl: sandboxUrl,
 							title: parseAgentOutput(fragmentTitleOutput),
-							files: result.state.data.files,
+							files: artifactVersion
+								? {
+										artifactVersionId: artifactVersion.id,
+										version: artifactVersion.version,
+										fileCount: Object.keys(artifactVersion.files).length,
+									}
+								: {
+										fileCount: Object.keys(result.state.data.files).length,
+									},
 						},
 					},
 				},

@@ -18,12 +18,15 @@ import { FileExplorer } from "@/components/file-explorer";
 import { UserControl } from "@/components/user-control";
 import { useAuth } from "@clerk/nextjs";
 import { ErrorBoundary } from "react-error-boundary";
+import { useTRPC } from "@/trpc/client";
+import { useSuspenseQuery } from "@tanstack/react-query";
 
 interface Props {
 	projectId: string;
 }
 
 export const ProjectView = ({ projectId }: Props) => {
+	const trpc = useTRPC();
 	const [autoActiveFragment, setAutoActiveFragment] = useState<Fragment | null>(
 		null,
 	);
@@ -50,6 +53,14 @@ export const ProjectView = ({ projectId }: Props) => {
 
 	const { has, isLoaded } = useAuth();
 	const hasProAccess = isLoaded ? has?.({ plan: "pro" }) : undefined;
+	const { data: latestArtifactVersion } = useSuspenseQuery(
+		trpc.artifacts.getLatest.queryOptions(
+			{ projectId },
+			{
+				refetchInterval: 1500,
+			},
+		),
+	);
 
 	return (
 		<div className="h-screen">
@@ -112,10 +123,14 @@ export const ProjectView = ({ projectId }: Props) => {
 							{!!activeFragment && <FragmentWeb data={activeFragment} />}
 						</TabsContent>
 						<TabsContent value="code" className="min-h-0">
-							{!!activeFragment?.files && (
+							{latestArtifactVersion ? (
 								<FileExplorer
-									files={activeFragment.files as { [path: string]: string }}
+									files={latestArtifactVersion.files}
 								/>
+							) : (
+								<div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+									No artifact version available yet.
+								</div>
 							)}
 						</TabsContent>
 					</Tabs>
