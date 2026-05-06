@@ -21,6 +21,7 @@ import { SANDBOX_TIMEOUT } from "./types";
 import { transition } from "@/modules/routing/state";
 import { logAuditEvent } from "@/modules/routing/audit";
 import { createArtifactVersion } from "@/modules/artifacts/server/service";
+import type { FailureCategory } from "@prisma/client";
 
 interface AgentState {
 	summary: string;
@@ -33,6 +34,25 @@ function getErrorSummary(error: unknown): string {
 	}
 
 	return String(error).slice(0, 500);
+}
+
+export function classifyError(error: unknown): FailureCategory {
+	const name = error instanceof Error ? error.name : "";
+	const message = getErrorSummary(error).toLowerCase();
+
+	if (name === "AbortError" || message.includes("timeout")) {
+		return "timeout";
+	}
+
+	if (message.includes("e2b") || message.includes("sandbox")) {
+		return "infra";
+	}
+
+	if (name === "ZodError" || message.includes("validation")) {
+		return "validation";
+	}
+
+	return "tool_error";
 }
 
 export const codeAgentFunction = inngest.createFunction(
@@ -367,6 +387,7 @@ export const codeAgentFunction = inngest.createFunction(
 		} catch (error) {
 			if (event.data.runId) {
 				const errorSummary = getErrorSummary(error);
+				const failureCategory = classifyError(error);
 
 				await step.run("mark-run-failed", async () => {
 					const updated = await transition(
@@ -377,6 +398,7 @@ export const codeAgentFunction = inngest.createFunction(
 						{
 							completedAt: new Date(),
 							errorSummary,
+							failureCategory,
 						},
 					);
 
@@ -387,6 +409,7 @@ export const codeAgentFunction = inngest.createFunction(
 							actor: "system",
 							payload: {
 								errorSummary,
+								failureCategory,
 							},
 						});
 					}

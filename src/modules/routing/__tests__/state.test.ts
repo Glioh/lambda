@@ -99,7 +99,7 @@ describe("run state helpers", () => {
 		const result = isTerminal(row.status) ? row : null;
 
 		assert.equal(result, null);
-		assert.deepEqual(STATE_TRANSITIONS.dispatched, ["running"]);
+		assert.deepEqual(STATE_TRANSITIONS.dispatched, ["running", "cancelled"]);
 	});
 
 	it("dispatched -> running transition succeeds", async () => {
@@ -188,8 +188,58 @@ describe("run state helpers", () => {
 		assert.equal(second, null);
 	});
 
-	it("cancelRun on confirmed is rejected (BAD_REQUEST)", () => {
-		assert.throws(() => assertAllowed("confirmed", "cancelled"), /BAD_REQUEST/);
+	it("confirmed -> cancelled transition succeeds", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "confirmed", draftValue: "build it" },
+		]);
+
+		const cancelledAt = new Date();
+		const cancelled = await guardedTransition(
+			prisma,
+			"run-1",
+			"confirmed",
+			"cancelled",
+			{ cancelledAt },
+		);
+
+		assert.equal(cancelled?.status, "cancelled");
+		assert.equal(cancelled?.cancelledAt, cancelledAt);
+	});
+
+	it("dispatched -> cancelled transition succeeds", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "dispatched", draftValue: "build it" },
+		]);
+
+		const cancelledAt = new Date();
+		const cancelled = await guardedTransition(
+			prisma,
+			"run-1",
+			"dispatched",
+			"cancelled",
+			{ cancelledAt },
+		);
+
+		assert.equal(cancelled?.status, "cancelled");
+		assert.equal(cancelled?.cancelledAt, cancelledAt);
+	});
+
+	it("running -> cancelled transition succeeds", async () => {
+		const { prisma } = createFakePrisma([
+			{ id: "run-1", status: "running", draftValue: "build it" },
+		]);
+
+		const cancelledAt = new Date();
+		const cancelled = await guardedTransition(
+			prisma,
+			"run-1",
+			"running",
+			"cancelled",
+			{ cancelledAt },
+		);
+
+		assert.equal(cancelled?.status, "cancelled");
+		assert.equal(cancelled?.cancelledAt, cancelledAt);
 	});
 
 	it("cancelRun on waiting_confirmation succeeds", async () => {

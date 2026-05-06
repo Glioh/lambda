@@ -5,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 import { logAuditEvent } from "../audit";
 import { transition } from "../state";
+import type { RunStatus } from "@prisma/client";
 
 const runInput = z.object({
 	runId: z.string().min(1, { message: "Run ID is required." }),
@@ -183,20 +184,6 @@ export const routingRouter = createTRPCRouter({
 				return run;
 			}
 
-			if (run.status === "dispatched") {
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message: "run already dispatched",
-				});
-			}
-
-			if (run.status === "running") {
-				throw new TRPCError({
-					code: "BAD_REQUEST",
-					message: "run already running; cannot cancel",
-				});
-			}
-
 			if (run.status === "success" || run.status === "failed") {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
@@ -204,10 +191,17 @@ export const routingRouter = createTRPCRouter({
 				});
 			}
 
-			if (run.status === "confirmed") {
+			const cancellableStatuses: RunStatus[] = [
+				"waiting_confirmation",
+				"confirmed",
+				"dispatched",
+				"running",
+			];
+
+			if (!cancellableStatuses.includes(run.status)) {
 				throw new TRPCError({
 					code: "BAD_REQUEST",
-					message: "run already confirmed; cannot cancel",
+					message: "run cannot be cancelled",
 				});
 			}
 
@@ -228,6 +222,15 @@ export const routingRouter = createTRPCRouter({
 				});
 			}
 
+			if (run.status === "dispatched" || run.status === "running") {
+				await inngest.send({
+					name: "code-agent/cancel",
+					data: {
+						runId: run.id,
+					},
+				});
+			}
+
 			await logAuditEvent(prisma, {
 				runId: cancelledRun.id,
 				action: "cancel",
@@ -238,5 +241,42 @@ export const routingRouter = createTRPCRouter({
 			});
 
 			return cancelledRun;
+		}),
+
+	/**
+	 * Mutation to create a retry run from a failed or cancelled run.
+	 */
+	retryRun: protectedProcedure
+		.input(runInput)
+		.mutation(async ({ input, ctx }) => {
+			const run = await getOwnedRun(input.runId, ctx.auth.userId);
+
+			if (run.status !== "failed" && run.status !== "cancelled") {
+				throw new TRPCError({
+					code: "BAD_REQUEST",
+					message: "only failed or cancelled runs can be retried",
+				});
+			}
+
+			const retry = await prisma.run.create({
+				data: {
+					projectId: run.projectId,
+					draftValue: run.draftValue,
+					messageId: run.messageId,
+					retriedFromRunId: run.id,
+					status: "waiting_confirmation",
+				},
+			});
+
+			await logAuditEvent(prisma, {
+				runId: retry.id,
+				action: "retry",
+				actor: ctx.auth.userId,
+				payload: {
+					retriedFromRunId: run.id,
+				},
+			});
+
+			return retry;
 		}),
 });

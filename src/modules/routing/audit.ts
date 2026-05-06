@@ -8,6 +8,7 @@ export type RoutingAuditAction =
 	| "edit_draft"
 	| "confirm"
 	| "cancel"
+	| "retry"
 	| "dispatch"
 	| "start"
 	| "success"

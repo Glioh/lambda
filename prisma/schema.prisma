@@ -81,6 +81,13 @@ enum RunStatus {
   cancelled
 }
 
+enum FailureCategory {
+  tool_error
+  timeout
+  infra
+  validation
+}
+
 model Run {
   id                String            @id @default(uuid())
   status            RunStatus         @default(waiting_confirmation)
@@ -89,7 +96,11 @@ model Run {
   startedAt         DateTime?
   completedAt       DateTime?
   errorSummary      String?
+  failureCategory   FailureCategory?
   cancelledAt       DateTime?
+  retriedFromRunId  String?
+  retriedFromRun    Run?              @relation("RunRetryLineage", fields: [retriedFromRunId], references: [id], onDelete: SetNull)
+  retries           Run[]             @relation("RunRetryLineage")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   projectId         String
