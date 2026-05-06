@@ -2,14 +2,16 @@ import { createHash } from "node:crypto";
 import {
 	ROUTING_RULES,
 	isStructuredBuildIntent,
+	isFuzzyBuildIntent,
 	isFollowUpModification,
 	isClearChatIntent,
 } from "./rules";
-import type { RoutingDecision, RoutingInput } from "./types";
+import type { RoutingDecision, RoutingInput } from "./types.ts";
 
 type RuleHit =
 	| "explicit_build"
 	| "structured_build"
+	| "fuzzy_build"
 	| "follow_up_build"
 	| "fallback";
 
@@ -39,6 +41,15 @@ export function decideRoute(
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "high",
+			requiresConfirmation: true,
+		});
+	}
+
+	if (isFuzzyBuildIntent(input.value, ROUTING_RULES)) {
+		return logAndReturn(input, logger, "fuzzy_build", {
+			decision: "build",
+			decisionSource: "auto",
+			confidence: "medium",
 			requiresConfirmation: true,
 		});
 	}

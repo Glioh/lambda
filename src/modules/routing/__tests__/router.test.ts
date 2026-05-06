@@ -109,6 +109,8 @@ describe("decideRoute", () => {
 			"build a landing page for my SaaS",
 			"create a next app",
 			"generate an app",
+			"build me a blue pag",
+			"make me a websit",
 			"```json\n{\"spec\":\"landing page\"}\n```",
 			"make it better",
 			"what is React?",
@@ -131,5 +133,70 @@ describe("decideRoute", () => {
 				},
 			);
 		}
+	});
+});
+
+describe("fuzzy build routing", () => {
+	it("routes build me a blue page to build via exact regex (high confidence)", () => {
+		assert.deepEqual(decideRoute({ value: "build me a blue page" }, logger), {
+			decision: "build",
+			decisionSource: "auto",
+			confidence: "high",
+			requiresConfirmation: true,
+		});
+	});
+
+	it("routes build me a blue pag to build via fuzzy match (medium confidence)", () => {
+		assert.deepEqual(decideRoute({ value: "build me a blue pag" }, logger), {
+			decision: "build",
+			decisionSource: "auto",
+			confidence: "medium",
+			requiresConfirmation: true,
+		});
+	});
+
+	it("routes make me a websit to build via fuzzy match", () => {
+		assert.deepEqual(decideRoute({ value: "make me a websit" }, logger), {
+			decision: "build",
+			decisionSource: "auto",
+			confidence: "medium",
+			requiresConfirmation: true,
+		});
+	});
+
+	it("routes create a dashbord to build via fuzzy match", () => {
+		assert.deepEqual(decideRoute({ value: "create a dashbord" }, logger), {
+			decision: "build",
+			decisionSource: "auto",
+			confidence: "medium",
+			requiresConfirmation: true,
+		});
+	});
+
+	it("routes how do I build a page? to chat (question guard)", () => {
+		assert.deepEqual(decideRoute({ value: "how do I build a page?" }, logger), {
+			decision: "chat",
+			decisionSource: "auto",
+			confidence: "low",
+			requiresConfirmation: false,
+		});
+	});
+
+	it("routes what is a landing page? to chat (conceptual question)", () => {
+		assert.deepEqual(decideRoute({ value: "what is a landing page?" }, logger), {
+			decision: "chat",
+			decisionSource: "auto",
+			confidence: "low",
+			requiresConfirmation: false,
+		});
+	});
+
+	it("routes build me a blue bag to chat (edit distance too high)", () => {
+		assert.deepEqual(decideRoute({ value: "build me a blue bag" }, logger), {
+			decision: "chat",
+			decisionSource: "auto",
+			confidence: "low",
+			requiresConfirmation: false,
+		});
 	});
 });
