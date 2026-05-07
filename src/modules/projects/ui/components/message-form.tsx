@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Usage } from "./usage";
 import { useRouter } from "next/navigation";
+import { useRunContext } from "@/modules/routing/ui/context/run-context";
 
 interface Props {
 	projectId: string;
@@ -46,6 +47,7 @@ export const MessageForm = ({
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
+	const { confirm: confirmRunAction, isActionPending } = useRunContext();
 
 	const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
@@ -55,10 +57,6 @@ export const MessageForm = ({
 			value: "",
 		},
 	});
-
-	// Simply create the object so we can use it to mutate later
-	const confirmRun = useMutation(trpc.routing.confirmRun.mutationOptions());
-	//
 
 	const createMessage = useMutation(
 		trpc.messages.create.mutationOptions({
@@ -79,14 +77,7 @@ export const MessageForm = ({
 					}
 
 					try {
-						await confirmRun.mutateAsync({
-							runId: message.runId,
-							draftValue: variables.value,
-						});
-
-						await queryClient.invalidateQueries(
-							trpc.messages.getMany.queryOptions({ projectId }), // update again because run confirmation can update message status
-						);
+						await confirmRunAction(message.runId, variables.value);
 					} catch (error) {
 						const errorMessage =
 							error instanceof Error ? error.message : "Unable to start build.";
@@ -223,7 +214,7 @@ export const MessageForm = ({
 
 	const [isFocused, setIsFocused] = React.useState(false);
 	const showUsage = !!usage && usage.remainingPoints <= LOW_CREDITS_THRESHOLD;
-	const isPending = createMessage.isPending || confirmRun.isPending;
+	const isPending = createMessage.isPending || isActionPending;
 	const isButtonDisabled = isPending || !form.formState.isValid;
 
 	return (

@@ -151,6 +151,63 @@ async function confirmRun(
 
 export const routingRouter = createTRPCRouter({
 	/**
+	 * Query to fetch all runs for a project with lineage and audit data.
+	 * Used by the frontend to display run status, retry carousel, and actions.
+	 */
+	getRunsForProject: protectedProcedure
+		.input(
+			z.object({
+				projectId: z.string().min(1, { message: "Project ID is required." }),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			const project = await prisma.project.findUnique({
+				where: { id: input.projectId },
+				select: { userId: true },
+			});
+
+			if (!project) {
+				throw new TRPCError({
+					code: "NOT_FOUND",
+					message: "Project not found.",
+				});
+			}
+
+			if (project.userId !== ctx.auth.userId) {
+				throw new TRPCError({
+					code: "FORBIDDEN",
+					message: "You do not have access to this project.",
+				});
+			}
+
+			const runs = await prisma.run.findMany({
+				where: { projectId: input.projectId },
+				include: {
+					retries: {
+						select: {
+							id: true,
+							status: true,
+							createdAt: true,
+						},
+						orderBy: { createdAt: "asc" },
+					},
+					auditLogs: {
+						select: {
+							action: true,
+							actor: true,
+							createdAt: true,
+							payload: true,
+						},
+						orderBy: { createdAt: "asc" },
+					},
+				},
+				orderBy: { createdAt: "desc" },
+			});
+
+			return runs;
+		}),
+
+	/**
 	 * Mutation to confirm a run and dispatch it to the code agent.
 	 * Orchestrates the full confirmation and dispatch workflow.
 	 */

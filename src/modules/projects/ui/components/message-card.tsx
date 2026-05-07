@@ -1,3 +1,5 @@
+"use client";
+
 import { Card } from "@/components/ui/card";
 import type { Fragment } from "@prisma/client";
 import { MessageRole, MessageType } from "@prisma/client";
@@ -5,6 +7,10 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ChevronRightIcon, Code2Icon } from "lucide-react";
 import Image from "next/image";
+import { useState, useMemo } from "react";
+import { useRunContext } from "@/modules/routing/ui/context/run-context";
+import { RunStatusCard } from "@/modules/routing/ui/components/run-status-card";
+import type { MessageRunRef } from "@/modules/routing/ui/types";
 
 interface UserMessageProps {
 	content: string;
@@ -12,8 +18,6 @@ interface UserMessageProps {
 
 /**
  * Renders a user-authored message bubble.
- * @param {UserMessageProps} props - The user message props.
- * @returns {JSX.Element} The rendered user message bubble.
  */
 const UserMessage = ({ content }: UserMessageProps) => {
 	return (
@@ -33,8 +37,6 @@ interface FragmentCardProps {
 
 /**
  * Renders a clickable fragment preview card.
- * @param {FragmentCardProps} props - The fragment card props.
- * @returns {JSX.Element} The rendered fragment card.
  */
 const FragmentCard = ({
 	fragment,
@@ -65,6 +67,38 @@ const FragmentCard = ({
 	);
 };
 
+interface RunStatusSectionProps {
+	messageId: string;
+	onOpenWorkspace: () => void;
+}
+
+/**
+ * Looks up the run lineage for a message and renders RunStatusCard.
+ */
+const RunStatusSection = ({ messageId, onOpenWorkspace }: RunStatusSectionProps) => {
+	const { lineages } = useRunContext();
+
+	const lineage = useMemo(
+		() => lineages.find((l) => l.messageId === messageId),
+		[lineages, messageId],
+	);
+
+	const [activeRunId, setActiveRunId] = useState<string | null>(null);
+
+	if (!lineage || lineage.runs.length === 0) return null;
+
+	const currentRunId = activeRunId ?? lineage.runs[lineage.runs.length - 1].id;
+
+	return (
+		<RunStatusCard
+			lineage={lineage}
+			activeRunId={currentRunId}
+			onRunSelect={setActiveRunId}
+			onOpenWorkspace={onOpenWorkspace}
+		/>
+	);
+};
+
 interface AssistantMessageProps {
 	content: string;
 	fragment: Fragment | null;
@@ -73,12 +107,13 @@ interface AssistantMessageProps {
 	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
 	isStreaming?: boolean;
+	messageId?: string;
+	runs?: MessageRunRef[];
+	onOpenWorkspace?: () => void;
 }
 
 /**
  * Renders an assistant message, including the optional fragment preview.
- * @param {AssistantMessageProps} props - The assistant message props.
- * @returns {JSX.Element} The rendered assistant message block.
  */
 const AssistantMessage = ({
 	content,
@@ -88,7 +123,12 @@ const AssistantMessage = ({
 	onFragmentClick,
 	type,
 	isStreaming,
+	messageId,
+	runs,
+	onOpenWorkspace,
 }: AssistantMessageProps) => {
+	const hasRuns = runs && runs.length > 0;
+
 	return (
 		<div
 			className={cn(
@@ -127,6 +167,12 @@ const AssistantMessage = ({
 						onFragmentClick={onFragmentClick}
 					/>
 				)}
+				{hasRuns && messageId && onOpenWorkspace && (
+					<RunStatusSection
+						messageId={messageId}
+						onOpenWorkspace={onOpenWorkspace}
+					/>
+				)}
 			</div>
 		</div>
 	);
@@ -141,12 +187,13 @@ interface MessageCardProps {
 	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
 	isStreaming?: boolean;
+	messageId?: string;
+	runs?: MessageRunRef[];
+	onOpenWorkspace?: () => void;
 }
 
 /**
  * Renders either the user message bubble or assistant message layout.
- * @param {MessageCardProps} props - The message card props.
- * @returns {JSX.Element} The rendered message card.
  */
 export const MessageCard = ({
 	content,
@@ -157,6 +204,9 @@ export const MessageCard = ({
 	onFragmentClick,
 	type,
 	isStreaming,
+	messageId,
+	runs,
+	onOpenWorkspace,
 }: MessageCardProps) => {
 	if (role === "ASSISTANT") {
 		return (
@@ -168,6 +218,9 @@ export const MessageCard = ({
 				onFragmentClick={onFragmentClick}
 				type={type}
 				isStreaming={isStreaming}
+				messageId={messageId}
+				runs={runs}
+				onOpenWorkspace={onOpenWorkspace}
 			/>
 		);
 	}

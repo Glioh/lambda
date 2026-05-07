@@ -13,6 +13,7 @@ interface Props {
 	onUserSelectFragment: (fragment: Fragment | null) => void;
 	onAutoSelectFragment: (fragment: Fragment | null) => void;
 	onUserMessageSendStart: () => void;
+	onOpenWorkspace: () => void;
 }
 
 /**
@@ -26,6 +27,7 @@ export const MessagesContainer = ({
 	onUserSelectFragment,
 	onAutoSelectFragment,
 	onUserMessageSendStart,
+	onOpenWorkspace,
 }: Props) => {
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
@@ -216,6 +218,9 @@ export const MessagesContainer = ({
 							}
 							onFragmentClick={() => onUserSelectFragment(message.fragment)}
 							type={message.type}
+							messageId={message.id}
+							runs={message.runs}
+							onOpenWorkspace={onOpenWorkspace}
 						/>
 					))}
 					{streamingMessage && (
