@@ -101,11 +101,32 @@ function createHandler({
 			},
 			message: {
 				findMany: mock.fn(async () => [
-					{ role: "USER", content: "Previous question" },
-					{ role: "ASSISTANT", content: "Previous answer" },
-					{ role: "USER", content: "What is React?" },
+					{
+						id: "message_3",
+						role: "USER",
+						content: "What is React?",
+						type: "RESULT",
+						createdAt: new Date("2026-04-23T00:00:02.000Z"),
+					},
+					{
+						id: "message_2",
+						role: "ASSISTANT",
+						content: "Previous answer",
+						type: "RESULT",
+						createdAt: new Date("2026-04-23T00:00:01.000Z"),
+					},
+					{
+						id: "message_1",
+						role: "USER",
+						content: "Previous question",
+						type: "RESULT",
+						createdAt: new Date("2026-04-23T00:00:00.000Z"),
+					},
 				]),
 				create: messageCreate,
+			},
+			artifactVersion: {
+				findFirst: mock.fn(async () => null),
 			},
 		} as never,
 	});
@@ -128,7 +149,14 @@ describe("POST /api/chat", () => {
 		assert.match(text, /data: \[DONE\]/);
 		assert.equal(
 			(completionCreate.mock.calls[0].arguments[0] as { model: string }).model,
-			"gpt-5-mini",
+			"gpt-4.1",
+		);
+		assert.match(
+			JSON.stringify(
+				(completionCreate.mock.calls[0].arguments[0] as { messages: unknown[] })
+					.messages,
+			),
+			/Thread-level memory context/,
 		);
 		assert.equal(messageCreate.mock.callCount(), 1);
 		assert.deepEqual(messageCreate.mock.calls[0].arguments[0].data, {
