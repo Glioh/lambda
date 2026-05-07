@@ -1,12 +1,16 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
+import {
+	assembleThreadMemory,
+	renderThreadMemoryContext,
+	type ThreadMemoryPrismaClient,
+} from "@/modules/memory/server/service";
 import { decideRoute } from "@/modules/routing";
 import { CHAT_PROMPT } from "@/prompt";
 import z from "zod";
 
 const CHAT_MODEL = "gpt-4.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
-const HISTORY_LIMIT = 20;
 
 const inputSchema = z.object({
 	value: z
@@ -50,20 +54,14 @@ interface OpenAIChatClient {
 }
 
 // Define a minimal Prisma client interface with only the methods used by the chat route, to avoid coupling to the full PrismaClient type.
-interface ChatPrismaClient {
+interface ChatPrismaClient extends ThreadMemoryPrismaClient {
 	project: {
 		findUnique: (args: {
 			where: { id: string; userId: string };
 			select: { id: true };
 		}) => Promise<{ id: string } | null>;
 	};
-	message: {
-		findMany: (args: {
-			where: { projectId: string };
-			orderBy: { createdAt: "desc" };
-			take: number;
-			select: { role: true; content: true };
-		}) => Promise<Array<{ role: "USER" | "ASSISTANT"; content: string }>>; // Promise resolves to arrray with key value pair role and content
+	message: ThreadMemoryPrismaClient["message"] & {
 		create: (args: {
 			data: {
 				projectId: string;
@@ -241,20 +239,10 @@ export function createChatPostHandler(
 
 		const { value, projectId } = parsedInput.data;
 
-		// Run project lookup and history fetch in parallel — projectId from
-		// input is the same value project.id would resolve to.
-		const [project, history] = await Promise.all([
-			dependencies.prisma.project.findUnique({
-				where: { id: projectId, userId },
-				select: { id: true },
-			}),
-			dependencies.prisma.message.findMany({
-				where: { projectId },
-				orderBy: { createdAt: "desc" },
-				take: HISTORY_LIMIT,
-				select: { role: true, content: true }, // select is used to return specific fields - role and content
-			}),
-		]);
+		const project = await dependencies.prisma.project.findUnique({
+			where: { id: projectId, userId },
+			select: { id: true },
+		});
 
 		if (!project) {
 			return Response.json({ error: "Project not found." }, { status: 404 });
@@ -270,20 +258,6 @@ export function createChatPostHandler(
 			);
 		}
 
-		const orderedHistory = history.reverse();
-		const messages: ChatCompletionMessage[] = [
-			{ role: "system", content: CHAT_PROMPT },
-			...orderedHistory.map((message) => ({
-				role: toOpenAIRole(message.role),
-				content: message.content,
-			})),
-		];
-
-		const lastMessage = orderedHistory[orderedHistory.length - 1];
-		if (lastMessage?.role !== "USER" || lastMessage.content !== value) {
-			messages.push({ role: "user", content: value });
-		}
-
 		const stream = new ReadableStream<Uint8Array>({
 			start: async (controller) => {
 				// Emit immediate ack so client sees activity before model TTFT
@@ -292,6 +266,18 @@ export function createChatPostHandler(
 				let content = "";
 
 				const runCompletion = async () => {
+					const memoryPack = await assembleThreadMemory(dependencies.prisma, {
+						projectId: project.id,
+						currentUserMessage: value,
+					});
+					const messages: ChatCompletionMessage[] = [
+						{ role: "system", content: CHAT_PROMPT },
+						{ role: "system", content: renderThreadMemoryContext(memoryPack) },
+						...memoryPack.recentMessages.map((message) => ({
+							role: toOpenAIRole(message.role),
+							content: message.content,
+						})),
+					];
 					const openai = await dependencies.createOpenAIClient();
 					const completionStream = await openai.chat.completions.create(
 						{

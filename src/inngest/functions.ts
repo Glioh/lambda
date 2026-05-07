@@ -21,6 +21,10 @@ import { SANDBOX_TIMEOUT } from "./types";
 import { transition } from "@/modules/routing/state";
 import { logAuditEvent } from "@/modules/routing/audit";
 import { createArtifactVersion } from "@/modules/artifacts/server/service";
+import {
+	assembleThreadMemory,
+	renderThreadMemoryContext,
+} from "@/modules/memory/server/service";
 import type { FailureCategory } from "@prisma/client";
 
 interface AgentState {
@@ -93,32 +97,33 @@ export const codeAgentFunction = inngest.createFunction(
 			return sandbox.sandboxId;
 		});
 
-		const previousMessages = await step.run(
-			"get-previous-messages",
-			async () => {
-				const formattedMessages: Message[] = [];
+		const previousMessages = await step.run("get-thread-memory", async () => {
+			const memoryPack = await assembleThreadMemory(prisma, {
+				projectId: event.data.projectId,
+				options: {
+					recentMessageLimit: 10,
+					maxContextChars: 18_000,
+					selectedWorkingFileLimit: 4,
+				},
+			});
+			const formattedMessages: Message[] = [
+				{
+					type: "text",
+					role: "user",
+					content: renderThreadMemoryContext(memoryPack),
+				},
+			];
 
-				const messages = await prisma.message.findMany({
-					where: {
-						projectId: event.data.projectId,
-					},
-					orderBy: {
-						createdAt: "desc",
-					},
-					take: 5,
+			for (const message of memoryPack.recentMessages) {
+				formattedMessages.push({
+					type: "text",
+					role: message.role === "ASSISTANT" ? "assistant" : "user",
+					content: message.content,
 				});
+			}
 
-				for (const message of messages) {
-					formattedMessages.push({
-						type: "text",
-						role: message.role === "ASSISTANT" ? "assistant" : "user",
-						content: message.content,
-					});
-				}
-
-				return formattedMessages.reverse(); // Reverse to have the most recent messages first
-			},
-		);
+			return formattedMessages;
+		});
 
 		const state = createState<AgentState>(
 			{
