@@ -1,5 +1,7 @@
+/** Represents the persisted role of a thread message. */
 export type ThreadMemoryRole = "USER" | "ASSISTANT";
 
+/** A single persisted chat message in the current project thread. */
 export interface ThreadMemoryMessage {
 	id?: string;
 	role: ThreadMemoryRole;
@@ -8,12 +10,14 @@ export interface ThreadMemoryMessage {
 	createdAt?: Date | string | null;
 }
 
+/** A selected working file included in thread memory context. */
 export interface ThreadMemoryFile {
 	path: string;
 	content: string;
 	truncated: boolean;
 }
 
+/** Metadata for the latest artifact version used in thread memory. */
 export interface ThreadMemoryArtifactVersion {
 	id?: string;
 	version: number;
@@ -24,17 +28,20 @@ export interface ThreadMemoryArtifactVersion {
 	files: ThreadMemoryArtifactFile[];
 }
 
+/** A file entry belonging to a persisted artifact version. */
 export interface ThreadMemoryArtifactFile {
 	path: string;
 	content: string;
 }
 
+/** Cached state for an existing conversation summary. */
 export interface ThreadMemorySummaryState {
 	content?: string | null;
 	lastMessageId?: string | null;
 	updatedAt?: Date | string | null;
 }
 
+/** Budget metadata for the assembled thread memory context. */
 export interface ThreadMemoryBudget {
 	maxChars: number;
 	usedChars: number;
@@ -44,6 +51,7 @@ export interface ThreadMemoryBudget {
 	truncatedWorkingFiles: number;
 }
 
+/** Refresh decision metadata for the current thread summary. */
 export interface ThreadMemorySummaryRefresh {
 	shouldRefresh: boolean;
 	reason: "missing" | "message_threshold" | "age_threshold" | "fresh";
@@ -51,6 +59,7 @@ export interface ThreadMemorySummaryRefresh {
 	nextRefreshAfterMessages: number;
 }
 
+/** The assembled thread memory payload used to build prompt context. */
 export interface ThreadMemoryPack {
 	recentMessages: ThreadMemoryMessage[];
 	conversationSummary: string;
@@ -60,6 +69,7 @@ export interface ThreadMemoryPack {
 	budget: ThreadMemoryBudget;
 }
 
+/** Runtime options for thread memory assembly. */
 export interface ThreadMemoryOptions {
 	recentMessageLimit?: number;
 	messageFetchLimit?: number;
