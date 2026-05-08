@@ -16,7 +16,6 @@ export interface RoutingDecision {
 	decision: Mode;
 	decisionSource: DecisionSource;
 	confidence: RoutingConfidence;
-	requiresConfirmation: boolean;
 }
 
 // ─── Extended submit payload ────────────────────────────────────────

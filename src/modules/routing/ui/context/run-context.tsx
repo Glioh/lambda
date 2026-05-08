@@ -8,10 +8,6 @@ export interface RunContextValue {
 	lineages: RunLineage[];
 	activeRun: RunWithLineage | null;
 	hasActiveBuild: boolean;
-	confirm: (runId: string, draftValue?: string) => Promise<void>;
-	cancel: (runId: string) => Promise<void>;
-	retry: (runId: string) => Promise<void>;
-	isActionPending: boolean;
 }
 
 const RunContext = createContext<RunContextValue | null>(null);

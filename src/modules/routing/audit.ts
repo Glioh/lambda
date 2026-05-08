@@ -5,10 +5,6 @@ import { Prisma } from "@prisma/client";
  */
 export type RoutingAuditAction =
 	| "create"
-	| "edit_draft"
-	| "confirm"
-	| "cancel"
-	| "retry"
 	| "dispatch"
 	| "start"
 	| "success"

@@ -32,7 +32,6 @@ export function decideRoute(
 			decision: "build",
 			decisionSource: "explicit",
 			confidence: "high",
-			requiresConfirmation: true,
 		});
 	}
 
@@ -41,7 +40,6 @@ export function decideRoute(
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "high",
-			requiresConfirmation: true,
 		});
 	}
 
@@ -50,7 +48,6 @@ export function decideRoute(
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "medium",
-			requiresConfirmation: true,
 		});
 	}
 
@@ -63,7 +60,6 @@ export function decideRoute(
 			decision: "build",
 			decisionSource: "auto",
 			confidence: "medium",
-			requiresConfirmation: true,
 		});
 	}
 
@@ -71,7 +67,6 @@ export function decideRoute(
 		decision: "chat",
 		decisionSource: "auto",
 		confidence: "low",
-		requiresConfirmation: false,
 	});
 }
 
@@ -91,7 +86,6 @@ function logAndReturn(
 		decision: decision.decision,
 		decisionSource: decision.decisionSource,
 		confidence: decision.confidence,
-		requiresConfirmation: decision.requiresConfirmation,
 		ruleHit,
 		ts: new Date().toISOString(),
 	});

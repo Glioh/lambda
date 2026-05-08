@@ -14,17 +14,35 @@ import type { MessageRunRef } from "@/modules/routing/ui/types";
 
 interface UserMessageProps {
 	content: string;
+	messageId?: string;
+	runs?: MessageRunRef[];
+	onOpenWorkspace?: () => void;
 }
 
 /**
  * Renders a user-authored message bubble.
  */
-const UserMessage = ({ content }: UserMessageProps) => {
+const UserMessage = ({
+	content,
+	messageId,
+	runs,
+	onOpenWorkspace,
+}: UserMessageProps) => {
+	const hasRuns = runs && runs.length > 0;
+
 	return (
-		<div className="flex justify-end pb-4 pr-2 pl-10">
+		<div className="flex flex-col items-end gap-2 pb-4 pr-2 pl-10">
 			<Card className="rounded-lg bg-muted p-3 shadow-none border-none max-w-[80%] break-words">
 				{content}
 			</Card>
+			{hasRuns && messageId && onOpenWorkspace && (
+				<div className="w-full max-w-[80%]">
+					<RunStatusSection
+						messageId={messageId}
+						onOpenWorkspace={onOpenWorkspace}
+					/>
+				</div>
+			)}
 		</div>
 	);
 };
@@ -225,5 +243,12 @@ export const MessageCard = ({
 		);
 	}
 
-	return <UserMessage content={content} />;
+	return (
+		<UserMessage
+			content={content}
+			messageId={messageId}
+			runs={runs}
+			onOpenWorkspace={onOpenWorkspace}
+		/>
+	);
 };

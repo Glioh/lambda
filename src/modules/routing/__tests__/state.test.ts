@@ -11,14 +11,12 @@ type RunRow = {
 	startedAt?: Date;
 	completedAt?: Date;
 	errorSummary?: string;
-	cancelledAt?: Date;
 };
 
-function createFakePrisma(rows: RunRow[]) {
-	const runs = new Map(rows.map((row) => [row.id, row]));
+function createFakePrisma(initialRuns: RunRow[]) {
+	const runs = new Map(initialRuns.map((run) => [run.id, { ...run }]));
 
 	return {
-		runs,
 		prisma: {
 			run: {
 				async update({
@@ -36,23 +34,14 @@ function createFakePrisma(rows: RunRow[]) {
 						});
 					}
 
-					const next = {
-						...row,
-						...(data as Partial<RunRow>),
-					};
-
-					runs.set(where.id, next);
-					return next;
+					const updated = { ...row, ...data } as RunRow;
+					runs.set(where.id, updated);
+					return updated;
 				},
 			},
 		},
+		runs,
 	};
-}
-
-function assertAllowed(from: RunStatus, to: RunStatus) {
-	if (!(STATE_TRANSITIONS[from] ?? []).includes(to)) {
-		throw new Error(`BAD_REQUEST: cannot transition ${from} to ${to}`);
-	}
 }
 
 async function guardedTransition(
@@ -62,46 +51,11 @@ async function guardedTransition(
 	to: RunStatus,
 	patch: Partial<RunRow> = {},
 ) {
-	assertAllowed(from, to);
+	assert.ok((STATE_TRANSITIONS[from] ?? []).includes(to));
 	return transition(fakePrisma, runId, from, to, patch);
 }
 
 describe("run state helpers", () => {
-	it("waiting_confirmation -> confirmed -> dispatched ok", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "waiting_confirmation", draftValue: "build it" },
-		]);
-
-		const confirmed = await guardedTransition(
-			prisma,
-			"run-1",
-			"waiting_confirmation",
-			"confirmed",
-		);
-		assert.equal(confirmed?.status, "confirmed");
-
-		const dispatchedAt = new Date();
-		const dispatched = await guardedTransition(prisma, "run-1", "confirmed", "dispatched", {
-			dispatchedAt,
-		});
-
-		assert.equal(dispatched?.status, "dispatched");
-		assert.equal(dispatched?.dispatchedAt, dispatchedAt);
-	});
-
-	it("confirmRun on dispatched is idempotent (no-op)", () => {
-		const row: RunRow = {
-			id: "run-1",
-			status: "dispatched",
-			draftValue: "build it",
-		};
-
-		const result = isTerminal(row.status) ? row : null;
-
-		assert.equal(result, null);
-		assert.deepEqual(STATE_TRANSITIONS.dispatched, ["running", "cancelled"]);
-	});
-
 	it("dispatched -> running transition succeeds", async () => {
 		const { prisma } = createFakePrisma([
 			{ id: "run-1", status: "dispatched", draftValue: "build it" },
@@ -157,129 +111,31 @@ describe("run state helpers", () => {
 		assert.equal(failed?.errorSummary, "sandbox failed");
 	});
 
-	it("isTerminal returns true only for completed and cancelled runs", () => {
-		assert.equal(isTerminal("success"), true);
-		assert.equal(isTerminal("failed"), true);
-		assert.equal(isTerminal("cancelled"), true);
-		assert.equal(isTerminal("dispatched"), false);
-	});
-
 	it("duplicate dispatched -> running is blocked", async () => {
 		const { prisma } = createFakePrisma([
 			{ id: "run-1", status: "dispatched", draftValue: "build it" },
 		]);
 
-		const first = await guardedTransition(
-			prisma,
-			"run-1",
-			"dispatched",
-			"running",
-			{ startedAt: new Date() },
-		);
-		const second = await transition(
-			prisma,
-			"run-1",
-			"dispatched",
-			"running",
-			{ startedAt: new Date() },
-		);
+		const first = await transition(prisma, "run-1", "dispatched", "running");
+		const second = await transition(prisma, "run-1", "dispatched", "running");
 
 		assert.equal(first?.status, "running");
 		assert.equal(second, null);
 	});
 
-	it("confirmed -> cancelled transition succeeds", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "confirmed", draftValue: "build it" },
-		]);
-
-		const cancelledAt = new Date();
-		const cancelled = await guardedTransition(
-			prisma,
-			"run-1",
-			"confirmed",
-			"cancelled",
-			{ cancelledAt },
-		);
-
-		assert.equal(cancelled?.status, "cancelled");
-		assert.equal(cancelled?.cancelledAt, cancelledAt);
+	it("isTerminal returns true only for completed runs", () => {
+		assert.equal(isTerminal("success"), true);
+		assert.equal(isTerminal("failed"), true);
+		assert.equal(isTerminal("dispatched"), false);
+		assert.equal(isTerminal("running"), false);
 	});
 
-	it("dispatched -> cancelled transition succeeds", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "dispatched", draftValue: "build it" },
-		]);
-
-		const cancelledAt = new Date();
-		const cancelled = await guardedTransition(
-			prisma,
-			"run-1",
-			"dispatched",
-			"cancelled",
-			{ cancelledAt },
-		);
-
-		assert.equal(cancelled?.status, "cancelled");
-		assert.equal(cancelled?.cancelledAt, cancelledAt);
+	it("exposes only immediate dispatch lifecycle transitions", () => {
+		assert.deepEqual(STATE_TRANSITIONS, {
+			dispatched: ["running"],
+			running: ["success", "failed"],
+			success: [],
+			failed: [],
+		});
 	});
-
-	it("running -> cancelled transition succeeds", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "running", draftValue: "build it" },
-		]);
-
-		const cancelledAt = new Date();
-		const cancelled = await guardedTransition(
-			prisma,
-			"run-1",
-			"running",
-			"cancelled",
-			{ cancelledAt },
-		);
-
-		assert.equal(cancelled?.status, "cancelled");
-		assert.equal(cancelled?.cancelledAt, cancelledAt);
-	});
-
-	it("cancelRun on waiting_confirmation succeeds", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "waiting_confirmation", draftValue: "build it" },
-		]);
-
-		const cancelledAt = new Date();
-		const cancelled = await guardedTransition(
-			prisma,
-			"run-1",
-			"waiting_confirmation",
-			"cancelled",
-			{ cancelledAt },
-		);
-
-		assert.equal(cancelled?.status, "cancelled");
-		assert.equal(cancelled?.cancelledAt, cancelledAt);
-	});
-
-	it("concurrent confirm + cancel only lets one stale status update win", async () => {
-		const { prisma } = createFakePrisma([
-			{ id: "run-1", status: "waiting_confirmation", draftValue: "build it" },
-		]);
-
-		const confirmed = await transition(
-			prisma,
-			"run-1",
-			"waiting_confirmation",
-			"confirmed",
-		);
-		const cancelled = await transition(
-			prisma,
-			"run-1",
-			"waiting_confirmation",
-			"cancelled",
-		);
-
-		assert.equal(confirmed?.status, "confirmed");
-		assert.equal(cancelled, null);
-	});
-
 });

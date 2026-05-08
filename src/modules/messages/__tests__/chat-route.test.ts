@@ -7,14 +7,12 @@ const chatDecision: RoutingDecision = {
 	decision: "chat",
 	decisionSource: "auto",
 	confidence: "low",
-	requiresConfirmation: false,
 };
 
 const buildDecision: RoutingDecision = {
 	decision: "build",
 	decisionSource: "auto",
 	confidence: "high",
-	requiresConfirmation: true,
 };
 
 /**
@@ -128,7 +126,7 @@ describe("POST /api/chat", () => {
 		assert.match(text, /data: \[DONE\]/);
 		assert.equal(
 			(completionCreate.mock.calls[0].arguments[0] as { model: string }).model,
-			"gpt-5-mini",
+			"gpt-4.1",
 		);
 		assert.equal(messageCreate.mock.callCount(), 1);
 		assert.deepEqual(messageCreate.mock.calls[0].arguments[0].data, {

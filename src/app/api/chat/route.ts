@@ -179,7 +179,6 @@ async function* parseOpenAIStream(
 	let buffer = "";
 
 	while (true) {
-		``;
 		const { value, done } = await reader.read();
 		if (done) {
 			break;

@@ -14,14 +14,11 @@ export interface RunWithLineage {
 	draftValue: string;
 	errorSummary: string | null;
 	failureCategory: FailureCategory | null;
-	cancelledAt: Date | null;
-	retriedFromRunId: string | null;
 	messageId: string | null;
 	createdAt: Date;
 	dispatchedAt: Date | null;
 	startedAt: Date | null;
 	completedAt: Date | null;
-	retries: { id: string; status: RunStatus; createdAt: Date }[];
 	auditLogs: {
 		action: string;
 		actor: string;

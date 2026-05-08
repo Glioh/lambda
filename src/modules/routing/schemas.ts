@@ -13,7 +13,6 @@ export const routingDecisionSchema = z.object({
 	decision: modeSchema,
 	decisionSource: z.enum(["auto", "explicit"]),
 	confidence: z.enum(["high", "medium", "low"]),
-	requiresConfirmation: z.boolean(),
 });
 
 export const submitInputSchema = z.object({

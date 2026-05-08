@@ -15,22 +15,19 @@ type PrismaLike<TRow = unknown> = { // wrap prisma type to avoid importing the e
 };
 
 export const STATE_TRANSITIONS: Record<RunStatus, RunStatus[]> = {
-	waiting_confirmation: ["confirmed", "cancelled"],
-	confirmed: ["dispatched", "cancelled"],
-	dispatched: ["running", "cancelled"],
-	running: ["success", "failed", "cancelled"],
+	dispatched: ["running"],
+	running: ["success", "failed"],
 	success: [],
 	failed: [],
-	cancelled: [],
 };
 
 /**
  * Checks whether a run status is final.
  * @param {RunStatus} status - The status to inspect.
- * @returns {boolean} True when the status is success, failed, or cancelled.
+ * @returns {boolean} True when the status is success or failed.
  */
 export function isTerminal(status: RunStatus): boolean {
-	return status === "success" || status === "failed" || status === "cancelled";
+	return status === "success" || status === "failed";
 }
 
 /**

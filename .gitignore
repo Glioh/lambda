@@ -56,3 +56,6 @@ progress.txt
 
 # Playwright
 .playwright-mcp
+
+# Agent
+.agent

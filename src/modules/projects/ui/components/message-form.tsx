@@ -12,7 +12,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Usage } from "./usage";
 import { useRouter } from "next/navigation";
-import { useRunContext } from "@/modules/routing/ui/context/run-context";
 
 interface Props {
 	projectId: string;
@@ -47,7 +46,6 @@ export const MessageForm = ({
 	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
-	const { confirm: confirmRunAction, isActionPending } = useRunContext();
 
 	const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
@@ -66,7 +64,6 @@ export const MessageForm = ({
 				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
 
 				if (message.routing.decision !== "chat") {
-					// Build path: await invalidation since we need fresh data before confirmRun
 					await queryClient.invalidateQueries(
 						trpc.messages.getMany.queryOptions({ projectId }),
 					);
@@ -74,15 +71,6 @@ export const MessageForm = ({
 					if (!message.runId) {
 						toast.error("Unable to start build.");
 						return;
-					}
-
-					try {
-						await confirmRunAction(message.runId, variables.value);
-					} catch (error) {
-						const errorMessage =
-							error instanceof Error ? error.message : "Unable to start build.";
-
-						toast.error(errorMessage);
 					}
 
 					return;
@@ -214,7 +202,7 @@ export const MessageForm = ({
 
 	const [isFocused, setIsFocused] = React.useState(false);
 	const showUsage = !!usage && usage.remainingPoints <= LOW_CREDITS_THRESHOLD;
-	const isPending = createMessage.isPending || isActionPending;
+	const isPending = createMessage.isPending;
 	const isButtonDisabled = isPending || !form.formState.isValid;
 
 	return (

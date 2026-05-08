@@ -5,13 +5,10 @@ import type { RunLineage } from "../types";
 import type { RunStatus } from "@prisma/client";
 
 const DOT_COLORS: Record<RunStatus, string> = {
-	waiting_confirmation: "bg-amber-400",
-	confirmed: "bg-amber-400",
 	dispatched: "bg-blue-400",
 	running: "bg-blue-400",
 	success: "bg-emerald-400",
 	failed: "bg-red-400",
-	cancelled: "bg-zinc-400",
 };
 
 interface RunLineageNavProps {

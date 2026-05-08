@@ -5,7 +5,7 @@ import {
 	usageProtectedProcedure,
 } from "@/trpc/init";
 import { decideRoute, routingInputSchema } from "@/modules/routing";
-import { logAuditEvent } from "@/modules/routing/audit";
+import { createAndDispatchBuildRun } from "@/modules/routing/server/dispatch";
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 
@@ -84,7 +84,7 @@ export const messagesRouter = createTRPCRouter({
 				prisma.run.count({
 					where: {
 						projectId: existingProject.id,
-						status: { in: ["dispatched", "confirmed"] },
+						status: { in: ["dispatched", "running"] },
 					},
 				}),
 			]);
@@ -101,20 +101,12 @@ export const messagesRouter = createTRPCRouter({
 				return { ...newMessage, routing: decision, runId: null };
 			}
 
-			const run = await prisma.run.create({
-				data: {
-					status: "waiting_confirmation",
-					draftValue: input.value,
-					projectId: existingProject.id,
-					messageId: newMessage.id,
-				},
-			});
-
-			await logAuditEvent(prisma, {
-				runId: run.id,
-				action: "create",
+			const run = await createAndDispatchBuildRun({
+				projectId: existingProject.id,
+				messageId: newMessage.id,
+				value: input.value,
 				actor: ctx.auth.userId,
-				payload: { decision },
+				decision,
 			});
 
 			return { ...newMessage, routing: decision, runId: run.id };

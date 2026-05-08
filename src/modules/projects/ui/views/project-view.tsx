@@ -22,7 +22,6 @@ import { ErrorBoundary } from "react-error-boundary";
 import { useTRPC } from "@/trpc/client";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { useProjectRuns } from "@/modules/routing/ui/hooks/use-project-runs";
-import { useRunActions } from "@/modules/routing/ui/hooks/use-run-actions";
 import { RunProvider } from "@/modules/routing/ui/context/run-context";
 import type { ImperativePanelHandle } from "react-resizable-panels";
 
@@ -51,17 +50,12 @@ export const ProjectView = ({ projectId }: Props) => {
 
 	// Run data
 	const projectRuns = useProjectRuns(projectId);
-	const runActions = useRunActions(projectId);
 
 	const runContextValue = {
 		runs: projectRuns.runs,
 		lineages: projectRuns.lineages,
 		activeRun: projectRuns.activeRun,
 		hasActiveBuild: projectRuns.hasActiveBuild,
-		confirm: runActions.confirm,
-		cancel: runActions.cancel,
-		retry: runActions.retry,
-		isActionPending: runActions.isPending,
 	};
 
 	const handleUserSelectFragment = (fragment: Fragment | null) => {
