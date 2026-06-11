@@ -56,6 +56,3 @@ progress.txt
 
 # Playwright
 .playwright-mcp
-
-# clerk configuration (can include secrets)
-/.clerk/
