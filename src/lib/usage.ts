@@ -1,6 +1,6 @@
 import { RateLimiterPrisma } from "rate-limiter-flexible";
 import { prisma } from "./db";
-import { auth } from "@clerk/nextjs/server";
+import { getAuth as auth } from "@/lib/auth";
 
 const FREE_POINTS = 10;
 const PRO_POINTS = 100;
