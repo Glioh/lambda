@@ -1,4 +1,4 @@
-import { getAuth as auth } from "@/lib/auth";
+import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
 import { decideRoute } from "@/modules/routing";
 import { CHAT_PROMPT } from "@/prompt";

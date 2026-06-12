@@ -8,14 +8,8 @@ const isPublicRoute = createRouteMatcher([
 	"/pricing(.*)",
 ]);
 
-// Dev-only: when DEV_AUTH_BYPASS=1 (outside production), skip route protection so
-// the app can be driven locally without completing the Clerk sign-in flow.
-const DEV_AUTH_BYPASS =
-	process.env.DEV_AUTH_BYPASS === "1" &&
-	process.env.NODE_ENV !== "production";
-
 export default clerkMiddleware(async (auth, req) => {
-	if (!DEV_AUTH_BYPASS && !isPublicRoute(req)) {
+	if (!isPublicRoute(req)) {
 		await auth.protect();
 	}
 });
