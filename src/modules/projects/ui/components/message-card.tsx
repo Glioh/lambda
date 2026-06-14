@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ChevronRightIcon, Code2Icon } from "lucide-react";
 import Image from "next/image";
+import { MarkdownContent } from "./markdown-content";
 
 interface UserMessageProps {
 	content: string;
@@ -110,8 +111,8 @@ const AssistantMessage = ({
 				</span>
 			</div>
 			<div className="pl-8.5 flex flex-col gap-y-4">
-				<span className="whitespace-pre-wrap">
-					{content}
+				<div>
+					<MarkdownContent content={content} />
 					{isStreaming && (
 						<span className="inline-flex pl-1 text-muted-foreground">
 							<span className="animate-pulse">.</span>
@@ -119,7 +120,7 @@ const AssistantMessage = ({
 							<span className="animate-pulse delay-300">.</span>
 						</span>
 					)}
-				</span>
+				</div>
 				{fragment && type === "RESULT" && (
 					<FragmentCard
 						fragment={fragment}
