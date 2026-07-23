@@ -1,6 +1,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import z from "zod";
+import { streamChatCompletion } from "@/lib/chat-stream";
 import { cn } from "@/lib/utils";
 import React from "react";
 import { Form, FormField } from "@/components/ui/form";
@@ -17,6 +18,7 @@ interface Props {
 	projectId: string;
 	onSendStart?: () => void;
 	onChatStreamStart?: () => void;
+	onChatStreamStatus?: (status: string) => void;
 	onChatStreamToken?: (token: string) => void;
 	onChatStreamEnd?: () => void;
 	onChatStreamError?: (message: string) => void;
@@ -39,6 +41,7 @@ export const MessageForm = ({
 	projectId,
 	onSendStart,
 	onChatStreamStart,
+	onChatStreamStatus,
 	onChatStreamToken,
 	onChatStreamEnd,
 	onChatStreamError,
@@ -133,77 +136,23 @@ export const MessageForm = ({
 	const streamChatResponse = async (value: string) => {
 		onChatStreamStart?.();
 
-		const response = await fetch("/api/chat", {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({
-				value,
-				projectId,
-			}),
-		});
-
-		if (!response.ok || !response.body) {
-			throw new Error("Unable to start chat response.");
-		}
-
-		const reader = response.body.getReader();
-		const decoder = new TextDecoder();
-		let buffer = "";
-
-		while (true) {
-			const { value: chunk, done } = await reader.read();
-
-			if (done) {
-				break;
-			}
-
-			buffer += decoder.decode(chunk, { stream: true });
-			const events = buffer.split("\n\n");
-			buffer = events.pop() ?? "";
-
-			for (const event of events) {
-				const lines = event.split("\n");
-				const eventName =
-					lines
-						.find((line) => line.startsWith("event: "))
-						?.slice("event: ".length) ?? "message";
-				const data = lines
-					.find((line) => line.startsWith("data: "))
-					?.slice("data: ".length);
-
-				if (!data) {
-					continue;
-				}
-
-				if (data === "[DONE]") {
-					await queryClient.invalidateQueries(
-						trpc.messages.getMany.queryOptions({ projectId }),
-					);
-
-					onChatStreamEnd?.();
-					return;
-				}
-
-				const parsed = JSON.parse(data) as { token?: string; error?: string };
-
-				if (eventName === "error") {
+		await streamChatCompletion(
+			{ value, projectId },
+			{
+				onStatus: (status) => onChatStreamStatus?.(status),
+				onToken: (token) => onChatStreamToken?.(token),
+				onError: (message) =>
 					onChatStreamError?.(
-						parsed.error ?? "Something went wrong. Please try again.",
-					);
-					continue;
-				}
+						message || "Something went wrong. Please try again.",
+					),
+			},
+		);
 
-				if (eventName === "status") {
-					continue;
-				}
+		await queryClient.invalidateQueries(
+			trpc.messages.getMany.queryOptions({ projectId }),
+		);
 
-				if (parsed.token) {
-					onChatStreamToken?.(parsed.token);
-				}
-			}
-		}
+		onChatStreamEnd?.();
 	};
 
 	/**

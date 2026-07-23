@@ -1,3 +1,4 @@
+import { streamChatCompletion } from "@/lib/chat-stream";
 import { useTRPC } from "@/trpc/client";
 import { useSuspenseQuery, useQueryClient } from "@tanstack/react-query";
 import { MessageCard } from "./message-card";
@@ -36,6 +37,7 @@ export const MessagesContainer = ({
 		content: string;
 		type: MessageType;
 		isStreaming: boolean;
+		status?: string;
 	} | null>(null);
 
 	const { data: messages } = useSuspenseQuery(
@@ -89,87 +91,35 @@ export const MessagesContainer = ({
 				});
 
 				try {
-					const response = await fetch("/api/chat", {
-						method: "POST",
-						headers: {
-							"Content-Type": "application/json",
-						},
-						body: JSON.stringify({
-							value,
-							projectId,
-						}),
-					});
-
-					if (!response.ok || !response.body) {
-						throw new Error("Unable to start chat response.");
-					}
-
-					const reader = response.body.getReader();
-					const decoder = new TextDecoder();
-					let buffer = "";
-
-					while (true) {
-						const { value: chunk, done } = await reader.read();
-
-						if (done) {
-							break;
-						}
-
-						buffer += decoder.decode(chunk, { stream: true });
-						const events = buffer.split("\n\n");
-						buffer = events.pop() ?? "";
-
-						for (const event of events) {
-							const lines = event.split("\n");
-							const eventName =
-								lines
-									.find((line) => line.startsWith("event: "))
-									?.slice("event: ".length) ?? "message";
-							const data = lines
-								.find((line) => line.startsWith("data: "))
-								?.slice("data: ".length);
-
-							if (!data) {
-								continue;
-							}
-
-							if (data === "[DONE]") {
-								await queryClient.invalidateQueries(
-									trpc.messages.getMany.queryOptions({ projectId }),
-								);
-
-								setStreamingMessage(null);
-								return;
-							}
-
-							const parsed = JSON.parse(data) as {
-								token?: string;
-								error?: string;
-							};
-
-							if (eventName === "error") {
-								setStreamingMessage({
-									content:
-										parsed.error ?? "Something went wrong. Please try again.",
-									type: "ERROR",
-									isStreaming: false,
-								});
-								continue;
-							}
-
-							if (eventName === "status") {
-								continue;
-							}
-
-							if (parsed.token) {
+					await streamChatCompletion(
+						{ value, projectId },
+						{
+							onStatus: (status) =>
 								setStreamingMessage((current) => ({
-									content: `${current?.content ?? ""}${parsed.token}`,
+									content: current?.content ?? "",
 									type: current?.type ?? "RESULT",
 									isStreaming: true,
-								}));
-							}
-						}
-					}
+									status,
+								})),
+							onToken: (token) =>
+								setStreamingMessage((current) => ({
+									content: `${current?.content ?? ""}${token}`,
+									type: current?.type ?? "RESULT",
+									isStreaming: true,
+								})),
+							onError: (message) =>
+								setStreamingMessage({
+									content: message,
+									type: "ERROR",
+									isStreaming: false,
+								}),
+						},
+					);
+
+					await queryClient.invalidateQueries(
+						trpc.messages.getMany.queryOptions({ projectId }),
+					);
+					setStreamingMessage(null);
 				} catch (error) {
 					const errorMessage =
 						error instanceof Error
@@ -228,6 +178,11 @@ export const MessagesContainer = ({
 							onFragmentClick={() => undefined}
 							type={streamingMessage.type}
 							isStreaming={streamingMessage.isStreaming}
+							statusLabel={
+								streamingMessage.status === "compacting"
+									? "Compacting conversation…"
+									: undefined
+							}
 						/>
 					)}
 					{isLastMessageUser && !streamingMessage && <MessageLoading />}
@@ -245,6 +200,14 @@ export const MessagesContainer = ({
 							type: "RESULT",
 							isStreaming: true,
 						})
+					}
+					onChatStreamStatus={(status) =>
+						setStreamingMessage((current) => ({
+							content: current?.content ?? "",
+							type: current?.type ?? "RESULT",
+							isStreaming: true,
+							status,
+						}))
 					}
 					onChatStreamToken={(token) =>
 						setStreamingMessage((current) => ({

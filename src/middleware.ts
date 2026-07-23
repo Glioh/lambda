@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { DEV_NO_AUTH } from "@/lib/dev-auth";
 
 const isPublicRoute = createRouteMatcher([
 	"/",
@@ -9,7 +10,8 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-	if (!isPublicRoute(req)) {
+	// Dev escape hatch: don't gate any route behind login.
+	if (!DEV_NO_AUTH && !isPublicRoute(req)) {
 		await auth.protect();
 	}
 });

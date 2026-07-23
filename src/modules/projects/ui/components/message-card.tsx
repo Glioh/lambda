@@ -3,8 +3,9 @@ import type { Fragment } from "@prisma/client";
 import { MessageRole, MessageType } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { ChevronRightIcon, Code2Icon } from "lucide-react";
+import { ChevronRightIcon, Code2Icon, SparklesIcon } from "lucide-react";
 import Image from "next/image";
+import { Markdown } from "@/components/markdown";
 
 interface UserMessageProps {
 	content: string;
@@ -65,6 +66,35 @@ const FragmentCard = ({
 	);
 };
 
+interface SummaryDividerProps {
+	content: string;
+}
+
+/**
+ * Renders a compaction checkpoint as an expandable divider in the thread.
+ * @param {SummaryDividerProps} props - The summary divider props.
+ * @returns {JSX.Element} The rendered compaction divider.
+ */
+const SummaryDivider = ({ content }: SummaryDividerProps) => {
+	return (
+		<div className="px-2 pb-4">
+			<details className="group/summary rounded-lg border border-dashed bg-muted/30 px-3 py-2">
+				<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground">
+					<SparklesIcon className="size-3.5 shrink-0" />
+					<span className="font-medium">Conversation compacted</span>
+					<span className="hidden sm:inline opacity-70">
+						— earlier messages summarized
+					</span>
+					<ChevronRightIcon className="ml-auto size-3.5 shrink-0 transition-transform group-open/summary:rotate-90" />
+				</summary>
+				<p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
+					{content}
+				</p>
+			</details>
+		</div>
+	);
+};
+
 interface AssistantMessageProps {
 	content: string;
 	fragment: Fragment | null;
@@ -73,6 +103,7 @@ interface AssistantMessageProps {
 	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
 	isStreaming?: boolean;
+	statusLabel?: string;
 }
 
 /**
@@ -88,6 +119,7 @@ const AssistantMessage = ({
 	onFragmentClick,
 	type,
 	isStreaming,
+	statusLabel,
 }: AssistantMessageProps) => {
 	return (
 		<div
@@ -110,8 +142,15 @@ const AssistantMessage = ({
 				</span>
 			</div>
 			<div className="pl-8.5 flex flex-col gap-y-4">
-				<span className="whitespace-pre-wrap">
-					{content}
+				<div>
+					{type === "ERROR" ? (
+						<span className="whitespace-pre-wrap">{content}</span>
+					) : (
+						<Markdown content={content} />
+					)}
+					{isStreaming && !content && statusLabel && (
+						<span className="italic text-muted-foreground">{statusLabel}</span>
+					)}
 					{isStreaming && (
 						<span className="inline-flex pl-1 text-muted-foreground">
 							<span className="animate-pulse">.</span>
@@ -119,7 +158,7 @@ const AssistantMessage = ({
 							<span className="animate-pulse delay-300">.</span>
 						</span>
 					)}
-				</span>
+				</div>
 				{fragment && type === "RESULT" && (
 					<FragmentCard
 						fragment={fragment}
@@ -141,6 +180,7 @@ interface MessageCardProps {
 	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
 	isStreaming?: boolean;
+	statusLabel?: string;
 }
 
 /**
@@ -157,7 +197,12 @@ export const MessageCard = ({
 	onFragmentClick,
 	type,
 	isStreaming,
+	statusLabel,
 }: MessageCardProps) => {
+	if (type === "SUMMARY") {
+		return <SummaryDivider content={content} />;
+	}
+
 	if (role === "ASSISTANT") {
 		return (
 			<AssistantMessage
@@ -168,6 +213,7 @@ export const MessageCard = ({
 				onFragmentClick={onFragmentClick}
 				type={type}
 				isStreaming={isStreaming}
+				statusLabel={statusLabel}
 			/>
 		);
 	}

@@ -1,6 +1,7 @@
 import { RateLimiterPrisma } from "rate-limiter-flexible";
 import { prisma } from "./db";
 import { auth } from "@clerk/nextjs/server";
+import { USAGE_LIMITS_DISABLED, resolveUserId } from "./dev-auth";
 
 const FREE_POINTS = 10;
 const PRO_POINTS = 100;
@@ -22,7 +23,12 @@ export async function getUsageTracker() {
 }
 
 export async function consumeCredits() {
-	const { userId } = await auth();
+	// Dev escape hatch: don't meter usage at all when limits are disabled.
+	if (USAGE_LIMITS_DISABLED) {
+		return null;
+	}
+
+	const userId = await resolveUserId();
 	if (!userId) {
 		throw new Error("User not authenticated");
 	}
@@ -33,7 +39,7 @@ export async function consumeCredits() {
 }
 
 export async function getUsageStatus() {
-	const { userId } = await auth();
+	const userId = await resolveUserId();
 	if (!userId) {
 		throw new Error("User not authenticated");
 	}

@@ -1,12 +1,22 @@
 import { auth } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/db";
+import {
+	DEFAULT_CONTEXT_CONFIG,
+	SUMMARY_PREAMBLE,
+	buildCompactionMessages,
+	buildSummaryContextBlock,
+	estimateMessageTokens,
+	estimateTokens,
+	planContextWindow,
+	type ContextConfig,
+} from "@/modules/context";
 import { decideRoute } from "@/modules/routing";
+import { DEV_FAKE_USER_ID, DEV_NO_AUTH } from "@/lib/dev-auth";
 import { CHAT_PROMPT } from "@/prompt";
 import z from "zod";
 
 const CHAT_MODEL = "gpt-4.1";
 const DEFAULT_TIMEOUT_MS = 30_000;
-const HISTORY_LIMIT = 20;
 
 const inputSchema = z.object({
 	value: z
@@ -42,6 +52,7 @@ interface OpenAIChatClient {
 					model: string;
 					messages: ChatCompletionMessage[];
 					stream: true;
+					max_tokens?: number;
 				},
 				options?: { signal?: AbortSignal },
 			) => Promise<ChatCompletionStream>;
@@ -58,18 +69,30 @@ interface ChatPrismaClient {
 		}) => Promise<{ id: string } | null>;
 	};
 	message: {
+		findFirst: (args: {
+			where: { projectId: string; type: "SUMMARY" };
+			orderBy: { createdAt: "desc" };
+			select: { content: true; createdAt: true };
+		}) => Promise<{ content: string; createdAt: Date } | null>; // The latest compaction checkpoint, if any
 		findMany: (args: {
-			where: { projectId: string };
+			where: {
+				projectId: string;
+				type: { not: "SUMMARY" };
+				createdAt?: { gt: Date };
+			};
 			orderBy: { createdAt: "desc" };
 			take: number;
-			select: { role: true; content: true };
-		}) => Promise<Array<{ role: "USER" | "ASSISTANT"; content: string }>>; // Promise resolves to arrray with key value pair role and content
+			select: { role: true; content: true; createdAt: true };
+		}) => Promise<
+			Array<{ role: "USER" | "ASSISTANT"; content: string; createdAt: Date }>
+		>; // Promise resolves to array of role, content, and createdAt
 		create: (args: {
 			data: {
 				projectId: string;
 				content: string; // The content of the message, either user input or assistant response.
 				role: "ASSISTANT";
-				type: "RESULT" | "ERROR";
+				type: "RESULT" | "ERROR" | "SUMMARY";
+				createdAt?: Date; // Explicit timestamp for SUMMARY checkpoints (boundary placement).
 			};
 		}) => Promise<unknown>; // Prisma will return the created message object, but we don't need to type it here since we don't use the return value - use unknown
 	};
@@ -82,6 +105,7 @@ interface ChatRouteDependencies {
 	decideRoute: typeof decideRoute;
 	createOpenAIClient: () => Promise<OpenAIChatClient>;
 	timeoutMs: number;
+	contextConfig: ContextConfig;
 }
 
 // SSE is technology that allows for streaming real time data to clients.
@@ -179,7 +203,6 @@ async function* parseOpenAIStream(
 	let buffer = "";
 
 	while (true) {
-		``;
 		const { value, done } = await reader.read();
 		if (done) {
 			break;
@@ -220,11 +243,14 @@ export function createChatPostHandler(
 		decideRoute,
 		createOpenAIClient: createDefaultOpenAIClient,
 		timeoutMs: Number(DEFAULT_TIMEOUT_MS),
+		contextConfig: DEFAULT_CONTEXT_CONFIG,
 		...overrides,
 	};
 
 	return async function POST(request: Request) {
-		const { userId } = await dependencies.auth();
+		const { userId: authUserId } = await dependencies.auth();
+		const userId =
+			authUserId ?? (DEV_NO_AUTH ? DEV_FAKE_USER_ID : null);
 
 		if (!userId) {
 			return Response.json({ error: "Not authenticated" }, { status: 401 });
@@ -241,18 +267,17 @@ export function createChatPostHandler(
 
 		const { value, projectId } = parsedInput.data;
 
-		// Run project lookup and history fetch in parallel — projectId from
+		// Run project lookup and checkpoint fetch in parallel — projectId from
 		// input is the same value project.id would resolve to.
-		const [project, history] = await Promise.all([
+		const [project, latestCheckpoint] = await Promise.all([
 			dependencies.prisma.project.findUnique({
 				where: { id: projectId, userId },
 				select: { id: true },
 			}),
-			dependencies.prisma.message.findMany({
-				where: { projectId },
+			dependencies.prisma.message.findFirst({
+				where: { projectId, type: "SUMMARY" },
 				orderBy: { createdAt: "desc" },
-				take: HISTORY_LIMIT,
-				select: { role: true, content: true }, // select is used to return specific fields - role and content
+				select: { content: true, createdAt: true },
 			}),
 		]);
 
@@ -270,19 +295,70 @@ export function createChatPostHandler(
 			);
 		}
 
-		const orderedHistory = history.reverse();
-		const messages: ChatCompletionMessage[] = [
-			{ role: "system", content: CHAT_PROMPT },
-			...orderedHistory.map((message) => ({
-				role: toOpenAIRole(message.role),
-				content: message.content,
-			})),
-		];
+		// Active history starts after the latest compaction checkpoint (opencode-style):
+		// older messages stay in the database but are only visible through the summary.
+		const history = await dependencies.prisma.message.findMany({
+			where: {
+				projectId,
+				type: { not: "SUMMARY" },
+				...(latestCheckpoint
+					? { createdAt: { gt: latestCheckpoint.createdAt } }
+					: {}),
+			},
+			orderBy: { createdAt: "desc" },
+			take: dependencies.contextConfig.historyFetchCap,
+			select: { role: true, content: true, createdAt: true }, // createdAt needed to place the checkpoint boundary
+		});
 
-		const lastMessage = orderedHistory[orderedHistory.length - 1];
-		if (lastMessage?.role !== "USER" || lastMessage.content !== value) {
-			messages.push({ role: "user", content: value });
-		}
+		const orderedHistory = history.reverse();
+
+		// The checkpoint content evolves if compaction runs during this request.
+		let summaryContent = latestCheckpoint?.content ?? null;
+
+		// Estimate the request pieces that are always present, then let the
+		// window planner decide whether we fit or need to compact first.
+		const fixedTokens =
+			estimateMessageTokens(CHAT_PROMPT) +
+			estimateMessageTokens(value) +
+			(summaryContent ? estimateTokens(SUMMARY_PREAMBLE) : 0);
+
+		const plan = planContextWindow({
+			summaryContent,
+			messages: orderedHistory,
+			fixedTokens,
+			config: dependencies.contextConfig,
+		});
+
+		/**
+		 * Builds the provider messages from the (possibly updated) checkpoint
+		 * and the verbatim tail of recent messages.
+		 */
+		const buildMessages = (): ChatCompletionMessage[] => {
+			const messages: ChatCompletionMessage[] = [
+				{ role: "system", content: CHAT_PROMPT },
+			];
+
+			if (summaryContent) {
+				messages.push({
+					role: "user",
+					content: buildSummaryContextBlock(summaryContent),
+				});
+			}
+
+			for (const message of plan.tail) {
+				messages.push({
+					role: toOpenAIRole(message.role),
+					content: message.content,
+				});
+			}
+
+			const lastMessage = plan.tail[plan.tail.length - 1];
+			if (lastMessage?.role !== "USER" || lastMessage.content !== value) {
+				messages.push({ role: "user", content: value });
+			}
+
+			return messages;
+		};
 
 		const stream = new ReadableStream<Uint8Array>({
 			start: async (controller) => {
@@ -293,10 +369,63 @@ export function createChatPostHandler(
 
 				const runCompletion = async () => {
 					const openai = await dependencies.createOpenAIClient();
+
+					if (plan.needsCompaction) {
+						// Fold the head of the conversation into a checkpoint before
+						// answering. Failure here must never block the user's answer —
+						// we fall back to sending the tail without an updated summary.
+						controller.enqueue(encodeStatus("compacting"));
+
+						try {
+							const summaryStream = await openai.chat.completions.create(
+								{
+									model: CHAT_MODEL,
+									messages: buildCompactionMessages(summaryContent, plan.head),
+									stream: true,
+									max_tokens: dependencies.contextConfig.summaryMaxTokens,
+								},
+								{ signal: abortController.signal },
+							);
+
+							let summaryText = "";
+							for await (const chunk of summaryStream) {
+								summaryText += chunk.choices?.[0]?.delta?.content ?? "";
+							}
+							summaryText = summaryText.trim();
+
+							if (summaryText) {
+								// Place the checkpoint boundary at the newest FOLDED message.
+								// Future history loads use `createdAt > checkpoint`, so the
+								// verbatim tail (which is newer than the head) stays in the
+								// active window instead of being orphaned behind the checkpoint.
+								const boundaryCreatedAt =
+									plan.head[plan.head.length - 1]?.createdAt;
+
+								await dependencies.prisma.message.create({
+									data: {
+										projectId: project.id,
+										content: summaryText,
+										role: "ASSISTANT",
+										type: "SUMMARY",
+										...(boundaryCreatedAt
+											? { createdAt: boundaryCreatedAt }
+											: {}),
+									},
+								});
+								summaryContent = summaryText;
+							}
+						} catch (error) {
+							console.error(
+								"Context compaction failed; continuing without checkpoint update.",
+								error,
+							);
+						}
+					}
+
 					const completionStream = await openai.chat.completions.create(
 						{
 							model: CHAT_MODEL,
-							messages,
+							messages: buildMessages(),
 							stream: true,
 						},
 						{ signal: abortController.signal },
