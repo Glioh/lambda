@@ -1,6 +1,7 @@
 export {
 	DEFAULT_CONTEXT_CONFIG,
 	compactionTriggerTokens,
+	validateContextConfig,
 	type ContextConfig,
 } from "./constants";
 export {

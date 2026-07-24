@@ -38,6 +38,25 @@ export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
 };
 
 /**
+ * Validates cross-field invariants that per-field parsing can't catch.
+ * Individually positive values can still describe an impossible budget
+ * (e.g. reserve >= total), which would push the compaction trigger to zero
+ * or negative and make it fire on every message. Fail fast instead.
+ * @throws {Error} When the config describes an unusable budget.
+ */
+export function validateContextConfig(config: ContextConfig): ContextConfig {
+	if (config.reserveOutputTokens >= config.contextTokenBudget) {
+		throw new Error(
+			`Invalid context config: reserveOutputTokens (${config.reserveOutputTokens}) must be less than contextTokenBudget (${config.contextTokenBudget}).`,
+		);
+	}
+	return config;
+}
+
+// Validate the process-wide default at module load so misconfiguration fails at boot.
+validateContextConfig(DEFAULT_CONTEXT_CONFIG);
+
+/**
  * The token estimate at which compaction triggers, mirroring opencode's
  * `context_limit - reserved_output` overflow check.
  */

@@ -57,8 +57,23 @@ export function planContextWindow<T extends { content: string }>({
 		};
 	}
 
+	// Budget the tail against what will actually be sent AFTER compaction:
+	// fixedTokens (system prompt + new message) + the replacement summary's
+	// worst-case size + the tail must stay under the trigger. Deriving the
+	// tail allowance this way prevents a large fixed prompt from producing a
+	// request that still overflows even though compaction "succeeded".
+	// minKeepMessages is always honored as a floor, even if it overshoots —
+	// we can never summarize away the most recent messages.
+	const tailAllowance = Math.max(
+		0,
+		Math.min(
+			config.keepRecentTokens,
+			compactionTriggerTokens(config) - fixedTokens - config.summaryMaxTokens,
+		),
+	);
+
 	// Walk backward from the newest message, keeping messages verbatim until
-	// the tail reaches the keep-recent budget (but always at least minKeepMessages).
+	// the tail reaches its allowance (but always at least minKeepMessages).
 	let tailStart = messages.length;
 	let tailTokens = 0;
 
@@ -67,7 +82,7 @@ export function planContextWindow<T extends { content: string }>({
 		const candidateTokens = estimateMessageTokens(candidate.content);
 		const mustKeep = messages.length - tailStart < config.minKeepMessages;
 
-		if (!mustKeep && tailTokens + candidateTokens > config.keepRecentTokens) {
+		if (!mustKeep && tailTokens + candidateTokens > tailAllowance) {
 			break;
 		}
 

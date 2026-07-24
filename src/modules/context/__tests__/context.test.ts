@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ContextConfig } from "../constants";
-import { compactionTriggerTokens } from "../constants";
+import { compactionTriggerTokens, validateContextConfig } from "../constants";
 import {
 	estimateMessageTokens,
 	estimateMessagesTokens,
@@ -50,6 +50,23 @@ describe("tokens", () => {
 describe("compactionTriggerTokens", () => {
 	it("is the budget minus the reserved output", () => {
 		assert.equal(compactionTriggerTokens(config), 300);
+	});
+});
+
+describe("validateContextConfig", () => {
+	it("accepts a config where reserve is below the budget", () => {
+		assert.equal(validateContextConfig(config), config);
+	});
+
+	it("throws when reserve is greater than or equal to the budget", () => {
+		assert.throws(
+			() => validateContextConfig({ ...config, reserveOutputTokens: 400 }),
+			/reserveOutputTokens/,
+		);
+		assert.throws(
+			() => validateContextConfig({ ...config, reserveOutputTokens: 500 }),
+			/must be less than contextTokenBudget/,
+		);
 	});
 });
 
@@ -134,6 +151,42 @@ describe("planContextWindow", () => {
 		assert.equal(plan.tail.length, 2);
 		assert.match(plan.tail[0].content, /^huge-1/);
 		assert.equal(plan.head.length, 1);
+	});
+
+	it("shrinks the verbatim tail as the fixed prompt grows (budgets the whole request)", () => {
+		// 8 messages of ~20 tokens each = ~160 tokens of history.
+		const messages = Array.from({ length: 8 }, (_, i) =>
+			messageOfTokens(16, `m${i + 1}`),
+		);
+
+		// Small fixed prompt: the tail allowance is large, so more is kept verbatim.
+		const smallFixed = planContextWindow({
+			summaryContent: null,
+			messages,
+			fixedTokens: 160,
+			config,
+		});
+
+		// Large fixed prompt: less room after reserving the summary envelope,
+		// so the tail must shrink — down to the minKeepMessages floor here.
+		const largeFixed = planContextWindow({
+			summaryContent: null,
+			messages,
+			fixedTokens: 220,
+			config,
+		});
+
+		assert.equal(smallFixed.needsCompaction, true);
+		assert.equal(largeFixed.needsCompaction, true);
+		assert.ok(
+			largeFixed.tail.length < smallFixed.tail.length,
+			"a bigger fixed prompt should keep fewer messages verbatim",
+		);
+		assert.equal(
+			largeFixed.tail.length,
+			config.minKeepMessages,
+			"the tail never drops below minKeepMessages",
+		);
 	});
 
 	it("skips compaction when there is nothing older to fold", () => {

@@ -23,14 +23,15 @@ export async function getUsageTracker() {
 }
 
 export async function consumeCredits() {
-	// Dev escape hatch: don't meter usage at all when limits are disabled.
-	if (USAGE_LIMITS_DISABLED) {
-		return null;
-	}
-
+	// Always authenticate first — disabling metering must not also disable auth.
 	const userId = await resolveUserId();
 	if (!userId) {
 		throw new Error("User not authenticated");
+	}
+
+	// Dev escape hatch: skip only the credit metering when limits are disabled.
+	if (USAGE_LIMITS_DISABLED) {
+		return null;
 	}
 
 	const usageTracker = await getUsageTracker();

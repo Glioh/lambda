@@ -8,12 +8,25 @@ import { auth } from "@clerk/nextjs/server";
  *                            as a fixed local user (also disables usage limits).
  * - DISABLE_USAGE_LIMITS=true → don't consume/enforce chat credits.
  */
-export const DEV_NO_AUTH = process.env.DEV_NO_AUTH === "true";
+const isProduction = process.env.NODE_ENV === "production";
+const devNoAuthRequested = process.env.DEV_NO_AUTH === "true";
+const disableUsageLimitsRequested =
+	process.env.DISABLE_USAGE_LIMITS === "true";
+
+// Fail fast: these bypasses must never be reachable in a production deploy,
+// even by misconfiguration. Refuse to boot rather than silently allowing them.
+if (isProduction && (devNoAuthRequested || disableUsageLimitsRequested)) {
+	throw new Error(
+		"DEV_NO_AUTH / DISABLE_USAGE_LIMITS are not allowed when NODE_ENV=production.",
+	);
+}
+
+export const DEV_NO_AUTH = !isProduction && devNoAuthRequested;
 
 export const DEV_FAKE_USER_ID = "dev-local-user";
 
 export const USAGE_LIMITS_DISABLED =
-	process.env.DISABLE_USAGE_LIMITS === "true" || DEV_NO_AUTH;
+	!isProduction && (disableUsageLimitsRequested || devNoAuthRequested);
 
 /**
  * Returns the current Clerk user id, or the fake local user id when DEV_NO_AUTH
