@@ -3,9 +3,15 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { cache } from "react";
 import superjson from "superjson";
 import { consumeCredits } from "@/lib/usage";
+import { DEV_FAKE_USER_ID, DEV_NO_AUTH } from "@/lib/dev-auth";
 
 export const createTRPCContext = cache(async () => {
-	return { auth: await auth() };
+	const resolved = await auth();
+	// Dev escape hatch: act as a fixed local user when nobody is signed in.
+	if (DEV_NO_AUTH && !resolved.userId) {
+		return { auth: { ...resolved, userId: DEV_FAKE_USER_ID } };
+	}
+	return { auth: resolved };
 });
 
 export type Context = Awaited<ReturnType<typeof createTRPCContext>>;

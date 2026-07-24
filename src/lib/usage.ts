@@ -1,6 +1,7 @@
 import { RateLimiterPrisma } from "rate-limiter-flexible";
 import { prisma } from "./db";
 import { auth } from "@clerk/nextjs/server";
+import { USAGE_LIMITS_DISABLED, resolveUserId } from "./dev-auth";
 
 const FREE_POINTS = 10;
 const PRO_POINTS = 100;
@@ -22,9 +23,15 @@ export async function getUsageTracker() {
 }
 
 export async function consumeCredits() {
-	const { userId } = await auth();
+	// Always authenticate first — disabling metering must not also disable auth.
+	const userId = await resolveUserId();
 	if (!userId) {
 		throw new Error("User not authenticated");
+	}
+
+	// Dev escape hatch: skip only the credit metering when limits are disabled.
+	if (USAGE_LIMITS_DISABLED) {
+		return null;
 	}
 
 	const usageTracker = await getUsageTracker();
@@ -33,7 +40,7 @@ export async function consumeCredits() {
 }
 
 export async function getUsageStatus() {
-	const { userId } = await auth();
+	const userId = await resolveUserId();
 	if (!userId) {
 		throw new Error("User not authenticated");
 	}
