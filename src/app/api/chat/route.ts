@@ -5,32 +5,68 @@ import {
 	SUMMARY_PREAMBLE,
 	buildCompactionMessages,
 	buildSummaryContextBlock,
+	estimateImageTokens,
 	estimateMessageTokens,
 	estimateTokens,
 	planContextWindow,
 	type ContextConfig,
 } from "@/modules/context";
-import { decideRoute } from "@/modules/routing";
 import { DEV_FAKE_USER_ID, DEV_NO_AUTH } from "@/lib/dev-auth";
 import { CHAT_PROMPT } from "@/prompt";
+import { after } from "next/server";
 import z from "zod";
 
 const CHAT_MODEL = "gpt-4.1";
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 45_000);
+/**
+ * Vision requests carrying several images routinely take far longer to first
+ * token than text-only ones, so they get a longer leash rather than being
+ * killed mid-answer.
+ */
+const VISION_TIMEOUT_MS = Number(process.env.CHAT_VISION_TIMEOUT_MS ?? 90_000);
 
-const inputSchema = z.object({
-	value: z
-		.string()
-		.min(1, { message: "Message cannot be empty." })
-		.max(10000, "Prompt is too long"),
-	projectId: z.string().min(1, { message: "Project ID is required." }),
-});
+export const runtime = "nodejs";
+export const maxDuration = 120;
+
+const inputSchema = z
+	.object({
+		value: z.string().max(10000, "Prompt is too long"),
+		projectId: z.string().min(1, { message: "Project ID is required." }),
+		/**
+		 * Set when the pending user message carries images but no text. The images
+		 * themselves are read from the database — see the history load below.
+		 */
+		hasAttachments: z.boolean().optional(),
+	})
+	.refine(
+		(input) => input.value.trim().length > 0 || input.hasAttachments === true,
+		{ message: "Message cannot be empty.", path: ["value"] },
+	);
 
 type ChatRole = "system" | "user" | "assistant";
 
+type ContentPart =
+	| { type: "text"; text: string }
+	| {
+			type: "image_url";
+			image_url: { url: string; detail: "auto" | "low" | "high" };
+	  };
+
 interface ChatCompletionMessage {
 	role: ChatRole;
-	content: string;
+	/**
+	 * A plain string whenever the message has no images. Only image-bearing
+	 * turns use the multipart form, so the common path stays simple.
+	 */
+	content: string | ContentPart[];
+}
+
+/** Attachment metadata carried alongside history. Never includes the payload. */
+interface HistoryAttachment {
+	id: string;
+	mimeType: string;
+	width: number;
+	height: number;
 }
 
 interface StreamChunk {
@@ -50,7 +86,10 @@ interface OpenAIChatClient {
 				// create.completions.create
 				body: {
 					model: string;
-					messages: ChatCompletionMessage[];
+					messages: Array<{
+						role: ChatRole;
+						content: string | ContentPart[];
+					}>;
 					stream: true;
 					max_tokens?: number;
 				},
@@ -82,10 +121,26 @@ interface ChatPrismaClient {
 			};
 			orderBy: { createdAt: "desc" };
 			take: number;
-			select: { role: true; content: true; createdAt: true };
+			select: {
+				role: true;
+				content: true;
+				createdAt: true;
+				// Metadata ONLY. `data` is deliberately absent: it is TOASTed base64
+				// and must never be pulled for every message in the window.
+				attachments: {
+					select: { id: true; mimeType: true; width: true; height: true };
+					orderBy: { createdAt: "asc" };
+				};
+			};
 		}) => Promise<
-			Array<{ role: "USER" | "ASSISTANT"; content: string; createdAt: Date }>
-		>; // Promise resolves to array of role, content, and createdAt
+			Array<{
+				role: "USER" | "ASSISTANT";
+				content: string;
+				createdAt: Date;
+				// Optional so existing test harnesses without attachments still fit.
+				attachments?: HistoryAttachment[];
+			}>
+		>; // Promise resolves to array of role, content, createdAt, and image metadata
 		create: (args: {
 			data: {
 				projectId: string;
@@ -96,16 +151,31 @@ interface ChatPrismaClient {
 			};
 		}) => Promise<unknown>; // Prisma will return the created message object, but we don't need to type it here since we don't use the return value - use unknown
 	};
+	/**
+	 * Second-phase fetch: pulls payloads for only the handful of images that will
+	 * actually be sent, keeping the per-message history load metadata-only.
+	 */
+	attachment: {
+		findMany: (args: {
+			where: { id: { in: string[] } };
+			select: { id: true; mimeType: true; data: true };
+		}) => Promise<Array<{ id: string; mimeType: string; data: string }>>;
+	};
 }
 
 // Define the dependencies for the chat route handler, allowing for easier testing and separation of concerns.
 interface ChatRouteDependencies {
 	auth: typeof auth;
 	prisma: ChatPrismaClient;
-	decideRoute: typeof decideRoute;
 	createOpenAIClient: () => Promise<OpenAIChatClient>;
 	timeoutMs: number;
 	contextConfig: ContextConfig;
+	/**
+	 * Runs work after the response is done. Defaults to Next's `after`, which
+	 * needs a request scope — injectable so route tests can call the handler with
+	 * a plain Request and still observe the post-disconnect write.
+	 */
+	scheduleAfterResponse: (task: () => Promise<void>) => void;
 }
 
 // SSE is technology that allows for streaming real time data to clients.
@@ -240,10 +310,10 @@ export function createChatPostHandler(
 	const dependencies: ChatRouteDependencies = {
 		auth,
 		prisma,
-		decideRoute,
 		createOpenAIClient: createDefaultOpenAIClient,
 		timeoutMs: Number(DEFAULT_TIMEOUT_MS),
 		contextConfig: DEFAULT_CONTEXT_CONFIG,
+		scheduleAfterResponse: after,
 		...overrides,
 	};
 
@@ -285,16 +355,6 @@ export function createChatPostHandler(
 			return Response.json({ error: "Project not found." }, { status: 404 });
 		}
 
-		// Build or chat?
-		const routing = dependencies.decideRoute({ value, projectId: project.id });
-
-		if (routing.decision !== "chat") {
-			return Response.json(
-				{ error: "Chat endpoint only accepts chat-routed messages.", routing },
-				{ status: 400 },
-			);
-		}
-
 		// Active history starts after the latest compaction checkpoint (opencode-style):
 		// older messages stay in the database but are only visible through the summary.
 		const history = await dependencies.prisma.message.findMany({
@@ -307,7 +367,16 @@ export function createChatPostHandler(
 			},
 			orderBy: { createdAt: "desc" },
 			take: dependencies.contextConfig.historyFetchCap,
-			select: { role: true, content: true, createdAt: true }, // createdAt needed to place the checkpoint boundary
+			select: {
+				role: true,
+				content: true,
+				createdAt: true, // needed to place the checkpoint boundary
+				// Metadata only — payloads are fetched below for the selected few.
+				attachments: {
+					select: { id: true, mimeType: true, width: true, height: true },
+					orderBy: { createdAt: "asc" },
+				},
+			},
 		});
 
 		const orderedHistory = history.reverse();
@@ -322,17 +391,108 @@ export function createChatPostHandler(
 			estimateMessageTokens(value) +
 			(summaryContent ? estimateTokens(SUMMARY_PREAMBLE) : 0);
 
+		/**
+		 * Token cost of a message's images, computed from stored dimensions so the
+		 * base64 payload never reaches the chars/4 text estimator.
+		 */
+		const imageTokensFor = (message: {
+			attachments?: HistoryAttachment[];
+		}): number =>
+			(message.attachments ?? []).reduce(
+				(total, attachment) =>
+					total + estimateImageTokens(attachment.width, attachment.height),
+				0,
+			);
+
 		const plan = planContextWindow({
 			summaryContent,
 			messages: orderedHistory,
 			fixedTokens,
 			config: dependencies.contextConfig,
+			extraTokens: imageTokensFor,
 		});
+
+		// Only the tail survives verbatim, so only it can carry images. Walk it
+		// newest-first up to the cap; anything older degrades to a text marker.
+		const selectedImageIds = new Set<string>();
+		const { maxImagesInContext } = dependencies.contextConfig;
+
+		for (
+			let index = plan.tail.length - 1;
+			index >= 0 && selectedImageIds.size < maxImagesInContext;
+			index -= 1
+		) {
+			for (const attachment of plan.tail[index].attachments ?? []) {
+				if (selectedImageIds.size >= maxImagesInContext) {
+					break;
+				}
+
+				selectedImageIds.add(attachment.id);
+			}
+		}
+
+		// Guarded so a history with no images never touches `prisma.attachment`.
+		const imageDataUrls = new Map<string, string>();
+
+		if (selectedImageIds.size > 0) {
+			const rows = await dependencies.prisma.attachment.findMany({
+				where: { id: { in: [...selectedImageIds] } },
+				select: { id: true, mimeType: true, data: true },
+			});
+
+			for (const row of rows) {
+				imageDataUrls.set(row.id, `data:${row.mimeType};base64,${row.data}`);
+			}
+		}
 
 		/**
 		 * Builds the provider messages from the (possibly updated) checkpoint
 		 * and the verbatim tail of recent messages.
 		 */
+		/**
+		 * Renders one persisted message as provider content.
+		 *
+		 * Returns a PLAIN STRING when there are no images: the string form is what
+		 * the rest of the pipeline assumes, and only image-bearing turns need the
+		 * multipart form.
+		 */
+		const toContent = (message: {
+			content: string;
+			attachments?: HistoryAttachment[];
+		}): string | ContentPart[] => {
+			const attachments = message.attachments ?? [];
+
+			if (attachments.length === 0) {
+				return message.content;
+			}
+
+			const parts: ContentPart[] = [];
+
+			if (message.content.trim()) {
+				parts.push({ type: "text", text: message.content });
+			}
+
+			for (const attachment of attachments) {
+				const url = imageDataUrls.get(attachment.id);
+
+				if (url) {
+					parts.push({
+						type: "image_url",
+						image_url: { url, detail: "high" },
+					});
+				} else {
+					// Past the image cap: keep the model aware that something was
+					// shared here without paying for the pixels again.
+					parts.push({
+						type: "text",
+						text: `[image omitted from context: ${attachment.mimeType} ${attachment.width}×${attachment.height}]`,
+					});
+				}
+			}
+
+			return parts;
+		};
+
 		const buildMessages = (): ChatCompletionMessage[] => {
 			const messages: ChatCompletionMessage[] = [
 				{ role: "system", content: CHAT_PROMPT },
@@ -348,7 +508,7 @@ export function createChatPostHandler(
 			for (const message of plan.tail) {
 				messages.push({
 					role: toOpenAIRole(message.role),
-					content: message.content,
+					content: toContent(message),
 				});
 			}
 
@@ -360,12 +520,98 @@ export function createChatPostHandler(
 			return messages;
 		};
 
+		// Hoisted out of `start` so the disconnect handlers below — which run after
+		// `start` has returned — can abort the upstream call and persist whatever
+		// streamed before the client went away.
+		const abortController = new AbortController();
+		let content = "";
+		let persisted = false;
+		let clientGone = false;
+
+		/**
+		 * Writes the assistant row at most once, whichever exit path wins the race
+		 * between normal completion, timeout, error, and client disconnect.
+		 */
+		const persistOnce = async (
+			text: string,
+			type: "RESULT" | "ERROR",
+		): Promise<void> => {
+			if (persisted) {
+				return;
+			}
+
+			persisted = true;
+
+			await dependencies.prisma.message.create({
+				data: {
+					projectId: project.id,
+					content: text,
+					role: "ASSISTANT",
+					type,
+				},
+			});
+		};
+
+		/** Closing an already-closed or errored controller throws; swallow that. */
+		const closeOnce = (
+			controller: ReadableStreamDefaultController<Uint8Array>,
+		) => {
+			try {
+				controller.close();
+			} catch {
+				// Already closed — nothing to do.
+			}
+		};
+
+		/**
+		 * Handles the user pressing stop (or navigating away): tear down the
+		 * upstream request so we stop paying for tokens, then persist whatever
+		 * already streamed so the partial answer survives a reload.
+		 */
+		const onClientGone = () => {
+			if (clientGone) {
+				return;
+			}
+
+			clientGone = true;
+			abortController.abort();
+
+			// The response stream is dead, so the write can't be awaited inline —
+			// hand it to the platform so the function isn't frozen before the
+			// INSERT lands. Nothing streamed means nothing worth saving.
+			if (content.length > 0) {
+				dependencies.scheduleAfterResponse(async () => {
+					try {
+						await persistOnce(content, "RESULT");
+					} catch (error) {
+						console.error(
+							"Failed to persist partial response after client disconnect.",
+							error,
+						);
+					}
+				});
+			}
+		};
+
+		request.signal.addEventListener("abort", onClientGone, { once: true });
+
 		const stream = new ReadableStream<Uint8Array>({
 			start: async (controller) => {
+				/** Enqueue that no-ops once the consumer is gone. */
+				const safeEnqueue = (chunk: Uint8Array) => {
+					if (clientGone) {
+						return;
+					}
+
+					try {
+						controller.enqueue(chunk);
+					} catch {
+						clientGone = true;
+					}
+				};
+
 				// Emit immediate ack so client sees activity before model TTFT
-				controller.enqueue(encodeStatus("thinking"));
-				const abortController = new AbortController();
-				let content = "";
+				safeEnqueue(encodeStatus("thinking"));
 
 				const runCompletion = async () => {
 					const openai = await dependencies.createOpenAIClient();
@@ -374,7 +620,7 @@ export function createChatPostHandler(
 						// Fold the head of the conversation into a checkpoint before
 						// answering. Failure here must never block the user's answer —
 						// we fall back to sending the tail without an updated summary.
-						controller.enqueue(encodeStatus("compacting"));
+						safeEnqueue(encodeStatus("compacting"));
 
 						try {
 							const summaryStream = await openai.chat.completions.create(
@@ -439,7 +685,7 @@ export function createChatPostHandler(
 						}
 
 						content += token;
-						controller.enqueue(encodeData({ token }));
+						safeEnqueue(encodeData({ token }));
 					}
 
 					return "completed" as const;
@@ -448,9 +694,15 @@ export function createChatPostHandler(
 				const completionPromise = runCompletion();
 
 				try {
+					// Tests inject a tiny timeout and no images, so they're unaffected.
+					const effectiveTimeoutMs =
+						selectedImageIds.size > 0
+							? Math.max(dependencies.timeoutMs, VISION_TIMEOUT_MS)
+							: dependencies.timeoutMs;
+
 					const result = await Promise.race([
 						completionPromise,
-						timeoutAfter(dependencies.timeoutMs),
+						timeoutAfter(effectiveTimeoutMs),
 					]);
 
 					if (result === "timeout") {
@@ -458,68 +710,50 @@ export function createChatPostHandler(
 						completionPromise.catch(() => undefined);
 
 						if (content.length > 0) {
-							await dependencies.prisma.message.create({
-								data: {
-									projectId: project.id,
-									content,
-									role: "ASSISTANT",
-									type: "RESULT",
-								},
-							});
+							await persistOnce(content, "RESULT");
 						} else {
-							await dependencies.prisma.message.create({
-								data: {
-									projectId: project.id,
-									content: "Chat response timed out. Please try again.",
-									role: "ASSISTANT",
-									type: "ERROR",
-								},
-							});
-							controller.enqueue(
+							await persistOnce(
+								"Chat response timed out. Please try again.",
+								"ERROR",
+							);
+							safeEnqueue(
 								encodeError("Chat response timed out. Please try again."),
 							);
 						}
 					} else {
-						await dependencies.prisma.message.create({
-							data: {
-								projectId: project.id,
-								content,
-								role: "ASSISTANT",
-								type: "RESULT",
-							},
-						});
+						await persistOnce(content, "RESULT");
 					}
 
-					controller.enqueue(encodeData("[DONE]"));
-					controller.close();
+					safeEnqueue(encodeData("[DONE]"));
+					closeOnce(controller);
 				} catch {
+					if (clientGone) {
+						// The user stopped generation. `onClientGone` owns the write so it
+						// still happens after this stream is torn down; adding an ERROR row
+						// here would contradict the partial answer we just saved.
+						closeOnce(controller);
+						return;
+					}
+
 					if (content.length > 0) {
-						await dependencies.prisma.message.create({
-							data: {
-								projectId: project.id,
-								content,
-								role: "ASSISTANT",
-								type: "RESULT",
-							},
-						});
+						await persistOnce(content, "RESULT");
 					} else {
-						await dependencies.prisma.message.create({
-							data: {
-								projectId: project.id,
-								content: "Something went wrong. Please try again.",
-								role: "ASSISTANT",
-								type: "ERROR",
-							},
-						});
-						controller.enqueue(
+						await persistOnce(
+							"Something went wrong. Please try again.",
+							"ERROR",
+						);
+						safeEnqueue(
 							encodeError("Something went wrong. Please try again."),
 						);
 					}
 
-					controller.enqueue(encodeData("[DONE]"));
-					controller.close();
+					safeEnqueue(encodeData("[DONE]"));
+					closeOnce(controller);
 				}
 			},
+			// Fires when the consumer tears the stream down in-process. The
+			// request-signal listener below covers the over-the-wire disconnect.
+			cancel: () => onClientGone(),
 		});
 
 		return new Response(stream, {

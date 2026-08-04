@@ -1,68 +1,79 @@
 import { Card } from "@/components/ui/card";
-import type { Fragment } from "@prisma/client";
 import { MessageRole, MessageType } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { ChevronRightIcon, Code2Icon, SparklesIcon } from "lucide-react";
+import { ChevronRightIcon, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 import { Markdown } from "@/components/markdown";
+import { MessageActions } from "./message-actions";
+import { MessageEditForm } from "./message-edit-form";
+import {
+	MessageAttachments,
+	type MessageAttachment,
+} from "@/modules/attachments/ui/components/message-attachments";
 
 interface UserMessageProps {
 	content: string;
+	attachments?: MessageAttachment[];
+	isEditing?: boolean;
+	isEditPending?: boolean;
+	onStartEdit?: () => void;
+	onCancelEdit?: () => void;
+	onSubmitEdit?: (value: string) => void;
+	onRetry?: () => void;
+	canRetry?: boolean;
 }
 
 /**
- * Renders a user-authored message bubble.
+ * Renders a user-authored message bubble, with any attached images above it.
  * @param {UserMessageProps} props - The user message props.
  * @returns {JSX.Element} The rendered user message bubble.
  */
-const UserMessage = ({ content }: UserMessageProps) => {
-	return (
-		<div className="flex justify-end pb-4 pr-2 pl-10">
-			<Card className="rounded-lg bg-muted p-3 shadow-none border-none max-w-[80%] break-words">
-				{content}
-			</Card>
-		</div>
-	);
-};
+const UserMessage = ({
+	content,
+	attachments,
+	isEditing,
+	isEditPending,
+	onStartEdit,
+	onCancelEdit,
+	onSubmitEdit,
+	onRetry,
+	canRetry,
+}: UserMessageProps) => {
+	const hasAttachments = !!attachments && attachments.length > 0;
 
-interface FragmentCardProps {
-	fragment: Fragment;
-	isActiveFragment: boolean;
-	onFragmentClick: (fragment: Fragment) => void;
-}
-
-/**
- * Renders a clickable fragment preview card.
- * @param {FragmentCardProps} props - The fragment card props.
- * @returns {JSX.Element} The rendered fragment card.
- */
-const FragmentCard = ({
-	fragment,
-	isActiveFragment,
-	onFragmentClick,
-}: FragmentCardProps) => {
 	return (
-		<button
-			className={cn(
-				"flex items-start text-start gap-2 border rounded-lg bg-muted w-fit p-3 hover:bg-secondary",
-				"transition-colors",
-				isActiveFragment &&
-					"bg-primary text-primary-foreground border-primary hover:bg-primary",
+		<div className="group flex flex-col items-end pb-4 pr-2 pl-10">
+			{hasAttachments && <MessageAttachments attachments={attachments} />}
+
+			{isEditing && onCancelEdit && onSubmitEdit ? (
+				<MessageEditForm
+					initialValue={content}
+					// Images alone are a complete message, so text may be cleared.
+					allowEmpty={hasAttachments}
+					isPending={isEditPending}
+					onCancel={onCancelEdit}
+					onSubmit={onSubmitEdit}
+				/>
+			) : (
+				<>
+					{/* An image on its own is a valid message, so skip the empty bubble. */}
+					{content.trim() && (
+						<Card className="rounded-lg bg-muted p-3 shadow-none border-none max-w-[80%] break-words whitespace-pre-wrap">
+							{content}
+						</Card>
+					)}
+					<MessageActions
+						content={content}
+						align="right"
+						onEdit={onStartEdit}
+						// Re-runs this prompt as-is, discarding the answers after it.
+						onRetry={onRetry}
+						canRetry={canRetry}
+					/>
+				</>
 			)}
-			onClick={() => onFragmentClick(fragment)}
-		>
-			<Code2Icon className="size-4 mt-0.5" />
-			<div className="flex flex-col flex-1">
-				<span className="text-sm font-medium line-clamp-1">
-					{fragment.title}
-				</span>
-				<span className="text-sm">Preview</span>
-			</div>
-			<div className="flex items-center justify-center mt-0.5">
-				<ChevronRightIcon className="size-4" />
-			</div>
-		</button>
+		</div>
 	);
 };
 
@@ -97,29 +108,29 @@ const SummaryDivider = ({ content }: SummaryDividerProps) => {
 
 interface AssistantMessageProps {
 	content: string;
-	fragment: Fragment | null;
 	createdAt: Date;
-	isActiveFragment: boolean;
-	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
 	isStreaming?: boolean;
 	statusLabel?: string;
+	isLast?: boolean;
+	onRetry?: () => void;
+	canRetry?: boolean;
 }
 
 /**
- * Renders an assistant message, including the optional fragment preview.
+ * Renders an assistant message.
  * @param {AssistantMessageProps} props - The assistant message props.
  * @returns {JSX.Element} The rendered assistant message block.
  */
 const AssistantMessage = ({
 	content,
-	fragment,
 	createdAt,
-	isActiveFragment,
-	onFragmentClick,
 	type,
 	isStreaming,
 	statusLabel,
+	isLast,
+	onRetry,
+	canRetry,
 }: AssistantMessageProps) => {
 	return (
 		<div
@@ -159,11 +170,16 @@ const AssistantMessage = ({
 						</span>
 					)}
 				</div>
-				{fragment && type === "RESULT" && (
-					<FragmentCard
-						fragment={fragment}
-						isActiveFragment={isActiveFragment}
-						onFragmentClick={onFragmentClick}
+				{/* Actions would be meaningless mid-stream: there's nothing final to
+				    copy and retrying would race the response being written. Retry is
+				    offered on every answer, including errors — those are otherwise
+				    dead ends you can only escape by retyping the prompt. */}
+				{!isStreaming && content && (
+					<MessageActions
+						content={content}
+						alwaysVisible={isLast}
+						onRetry={onRetry}
+						canRetry={canRetry}
 					/>
 				)}
 			</div>
@@ -174,13 +190,21 @@ const AssistantMessage = ({
 interface MessageCardProps {
 	content: string;
 	role: MessageRole;
-	fragment: Fragment | null;
 	createdAt: Date;
-	isActiveFragment: boolean;
-	onFragmentClick: (fragment: Fragment) => void;
 	type: MessageType;
 	isStreaming?: boolean;
 	statusLabel?: string;
+	/** The newest message in the thread: pins its action row open. */
+	isLast?: boolean;
+	/** Rolls the thread back to this answer and re-runs the prompt behind it. */
+	onRetry?: () => void;
+	canRetry?: boolean;
+	attachments?: MessageAttachment[];
+	isEditing?: boolean;
+	isEditPending?: boolean;
+	onStartEdit?: () => void;
+	onCancelEdit?: () => void;
+	onSubmitEdit?: (value: string) => void;
 }
 
 /**
@@ -191,13 +215,19 @@ interface MessageCardProps {
 export const MessageCard = ({
 	content,
 	role,
-	fragment,
 	createdAt,
-	isActiveFragment,
-	onFragmentClick,
 	type,
 	isStreaming,
 	statusLabel,
+	isLast,
+	onRetry,
+	canRetry,
+	attachments,
+	isEditing,
+	isEditPending,
+	onStartEdit,
+	onCancelEdit,
+	onSubmitEdit,
 }: MessageCardProps) => {
 	if (type === "SUMMARY") {
 		return <SummaryDivider content={content} />;
@@ -207,16 +237,28 @@ export const MessageCard = ({
 		return (
 			<AssistantMessage
 				content={content}
-				fragment={fragment}
 				createdAt={createdAt}
-				isActiveFragment={isActiveFragment}
-				onFragmentClick={onFragmentClick}
 				type={type}
 				isStreaming={isStreaming}
 				statusLabel={statusLabel}
+				isLast={isLast}
+				onRetry={onRetry}
+				canRetry={canRetry}
 			/>
 		);
 	}
 
-	return <UserMessage content={content} />;
+	return (
+		<UserMessage
+			content={content}
+			attachments={attachments}
+			isEditing={isEditing}
+			isEditPending={isEditPending}
+			onStartEdit={onStartEdit}
+			onCancelEdit={onCancelEdit}
+			onSubmitEdit={onSubmitEdit}
+			onRetry={onRetry}
+			canRetry={canRetry}
+		/>
+	);
 };

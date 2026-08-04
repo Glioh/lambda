@@ -183,11 +183,12 @@ function Sidebar({
 		);
 	}
 
-	if (isMobile === undefined) {
-		return null;
-	}
-
-	if (isMobile) {
+	// `isMobile` is undefined during SSR and on the first client render. Falling
+	// through to the desktop markup (rather than returning null) keeps the server
+	// and client output identical, which is what avoids a hydration mismatch and
+	// the sidebar popping in after load. The desktop branch is `hidden md:block`,
+	// so on a narrow viewport it stays invisible until the Sheet takes over below.
+	if (isMobile === true) {
 		return (
 			<Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
 				<SheetContent

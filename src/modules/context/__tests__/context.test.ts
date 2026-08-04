@@ -3,6 +3,9 @@ import { describe, it } from "node:test";
 import type { ContextConfig } from "../constants";
 import { compactionTriggerTokens, validateContextConfig } from "../constants";
 import {
+	FALLBACK_IMAGE_TOKENS,
+	LOW_DETAIL_IMAGE_TOKENS,
+	estimateImageTokens,
 	estimateMessageTokens,
 	estimateMessagesTokens,
 	estimateTokens,
@@ -21,6 +24,7 @@ const config: ContextConfig = {
 	summaryMaxTokens: 60,
 	minKeepMessages: 2,
 	historyFetchCap: 200,
+	maxImagesInContext: 4,
 };
 
 /**
@@ -240,5 +244,122 @@ describe("buildSummaryContextBlock", () => {
 
 		assert.ok(block.startsWith(SUMMARY_PREAMBLE));
 		assert.match(block, /The user wants a blog\./);
+	});
+});
+
+describe("estimateImageTokens", () => {
+	it("charges a flat rate for low-detail images", () => {
+		assert.equal(
+			estimateImageTokens(4000, 3000, "low"),
+			LOW_DETAIL_IMAGE_TOKENS,
+		);
+	});
+
+	it("charges per 512px tile after scaling the short edge to 768", () => {
+		// 1024x1024 -> 768x768 -> 2x2 tiles.
+		assert.equal(estimateImageTokens(1024, 1024), 85 + 170 * 4);
+		// 512x512 is already under the target -> a single tile.
+		assert.equal(estimateImageTokens(512, 512), 85 + 170);
+	});
+
+	it("clamps very large images before tiling", () => {
+		// A 4000x3000 image fits into 2048 then scales to a 1024x768 box.
+		assert.equal(estimateImageTokens(4000, 3000), 85 + 170 * 4);
+	});
+
+	it("falls back to a fixed estimate when dimensions are unusable", () => {
+		assert.equal(estimateImageTokens(), FALLBACK_IMAGE_TOKENS);
+		assert.equal(estimateImageTokens(0, 100), FALLBACK_IMAGE_TOKENS);
+		assert.equal(estimateImageTokens(-1, -1), FALLBACK_IMAGE_TOKENS);
+	});
+});
+
+describe("planContextWindow with extraTokens", () => {
+	const config: ContextConfig = {
+		contextTokenBudget: 400,
+		reserveOutputTokens: 100,
+		keepRecentTokens: 60,
+		summaryMaxTokens: 50,
+		minKeepMessages: 2,
+		historyFetchCap: 200,
+		maxImagesInContext: 4,
+	};
+
+	const messages = [
+		{ role: "USER" as const, content: "one" },
+		{ role: "ASSISTANT" as const, content: "two" },
+		{ role: "USER" as const, content: "three" },
+		{ role: "ASSISTANT" as const, content: "four" },
+	];
+
+	it("produces identical output to before when extraTokens is omitted", () => {
+		// Guards the optional-parameter refactor: passing a zero-cost function
+		// must be indistinguishable from passing nothing at all.
+		const withoutHook = planContextWindow({
+			summaryContent: null,
+			messages,
+			fixedTokens: 10,
+			config,
+		});
+		const withZeroHook = planContextWindow({
+			summaryContent: null,
+			messages,
+			fixedTokens: 10,
+			config,
+			extraTokens: () => 0,
+		});
+
+		assert.deepEqual(withoutHook, withZeroHook);
+		assert.equal(withoutHook.needsCompaction, false);
+	});
+
+	it("counts extra tokens toward the compaction trigger", () => {
+		const plan = planContextWindow({
+			summaryContent: null,
+			messages,
+			fixedTokens: 10,
+			config,
+			extraTokens: () => 200,
+		});
+
+		assert.equal(plan.needsCompaction, true);
+		assert.ok(plan.head.length > 0);
+		assert.equal(plan.head.length + plan.tail.length, messages.length);
+	});
+
+	it("counts extra tokens when sizing the verbatim tail", () => {
+		// Each message now costs more than the tail allowance, so only the
+		// minKeepMessages floor survives.
+		const plan = planContextWindow({
+			summaryContent: null,
+			messages,
+			fixedTokens: 10,
+			config,
+			extraTokens: () => 200,
+		});
+
+		assert.equal(plan.tail.length, config.minKeepMessages);
+	});
+});
+
+describe("buildCompactionMessages with attachments", () => {
+	it("renders an image placeholder instead of any payload", () => {
+		const messages = buildCompactionMessages(null, [
+			{
+				role: "USER",
+				content: "what is this",
+				attachments: [{ mimeType: "image/png", width: 1024, height: 768 }],
+			},
+		]);
+
+		assert.match(messages[1].content, /\[image attached: image\/png 1024×768\]/);
+	});
+
+	it("omits the placeholder entirely when there are no attachments", () => {
+		const messages = buildCompactionMessages(null, [
+			{ role: "USER", content: "no images here" },
+		]);
+
+		assert.equal(messages[1].content.includes("[image attached"), false);
 	});
 });

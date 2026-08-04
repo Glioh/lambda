@@ -20,9 +20,14 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages Message[]
-  pendingRuns PendingRun[]
+  /// NULL means `name` is still the random-word-slugs placeholder and the LLM
+  /// titler may overwrite it. Stamped by both the titler and a manual rename,
+  /// so neither can clobber the other.
+  titleGeneratedAt DateTime?
 
+  messages Message[]
+
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 enum MessageRole {
@@ -46,63 +51,36 @@ model Message {
 
   projectId String
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
 
-  fragment Fragment?
-  pendingRuns PendingRun[]
+  @@index([projectId, createdAt])
+  @@index([projectId, type, createdAt])
 }
 
-model Fragment {
+/// User-uploaded images, stored as base64 directly in Postgres.
+///
+/// `data` is the base64 payload ONLY — no `data:<mime>;base64,` prefix; the two
+/// consumers reassemble the data URL themselves. Never select `data` in a list
+/// query: it is a TOASTed multi-megabyte value, and it must never appear in a
+/// tRPC response (the chat message list polls while streaming). The only reads
+/// are /api/attachments/[attachmentId] and the chat route's capped by-id fetch.
+model Attachment {
   id String @id @default(uuid())
-  messageId String @unique
+  mimeType String
+  data String
+  width Int
+  height Int
+  byteSize Int
+  createdAt DateTime @default(now())
+
+  messageId String
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
-  sandboxUrl String
-  title String
-  files Json
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  @@index([messageId])
 }
 
 model Usage {
   key String @id
   points Int
   expire DateTime?
-}
-
-enum PendingRunStatus {
-  waiting_confirmation
-  confirmed
-  dispatched
-  cancelled
-}
-
-model PendingRun {
-  id String @id @default(uuid())
-  status PendingRunStatus @default(waiting_confirmation)
-  draftValue String
-  dispatchedAt DateTime?
-  cancelledAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  projectId String
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  messageId String?
-  message Message? @relation(fields: [messageId], references: [id], onDelete: SetNull)
-
-  auditLogs RoutingAuditLog[]
-}
-
-model RoutingAuditLog {
-  id String @id @default(uuid())
-  pendingRunId String
-  pendingRun PendingRun @relation(fields: [pendingRunId], references: [id], onDelete: Cascade)
-
-  action String
-  actor String
-  payload Json?
-  createdAt DateTime @default(now())
 }

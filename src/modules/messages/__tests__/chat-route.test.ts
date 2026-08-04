@@ -2,21 +2,6 @@ import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
 import { createChatPostHandler } from "@/app/api/chat/route";
 import { SUMMARY_PREAMBLE, type ContextConfig } from "@/modules/context";
-import type { RoutingDecision } from "@/modules/routing";
-
-const chatDecision: RoutingDecision = {
-	decision: "chat",
-	decisionSource: "auto",
-	confidence: "low",
-	requiresConfirmation: false,
-};
-
-const buildDecision: RoutingDecision = {
-	decision: "build",
-	decisionSource: "auto",
-	confidence: "high",
-	requiresConfirmation: true,
-};
 
 /** Large budget so compaction never triggers unless a test opts in. */
 const relaxedContextConfig: ContextConfig = {
@@ -26,6 +11,7 @@ const relaxedContextConfig: ContextConfig = {
 	summaryMaxTokens: 600,
 	minKeepMessages: 2,
 	historyFetchCap: 200,
+	maxImagesInContext: 4,
 };
 
 /** Tiny budget so compaction triggers with a handful of messages. */
@@ -36,17 +22,30 @@ const tinyContextConfig: ContextConfig = {
 	summaryMaxTokens: 50,
 	minKeepMessages: 2,
 	historyFetchCap: 200,
+	maxImagesInContext: 4,
 };
+
+interface HistoryAttachment {
+	id: string;
+	mimeType: string;
+	width: number;
+	height: number;
+}
 
 interface HistoryMessage {
 	role: "USER" | "ASSISTANT";
 	createdAt?: Date;
 	content: string;
+	attachments?: HistoryAttachment[];
 }
+
+type ContentPart =
+	| { type: "text"; text: string }
+	| { type: "image_url"; image_url: { url: string; detail: string } };
 
 interface CompletionBody {
 	model: string;
-	messages: Array<{ role: string; content: string }>;
+	messages: Array<{ role: string; content: string | ContentPart[] }>;
 	stream: true;
 	max_tokens?: number;
 }
@@ -56,13 +55,14 @@ interface CompletionBody {
  * @param {string} value - The message text to submit.
  * @returns {Request} The chat route request.
  */
-function createRequest(value = "What is React?") {
+function createRequest(value = "What is React?", signal?: AbortSignal) {
 	return new Request("http://localhost/api/chat", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 		},
 		body: JSON.stringify({ value, projectId: "project_1" }),
+		signal,
 	});
 }
 
@@ -91,12 +91,29 @@ async function* hangingStream(signal?: AbortSignal) {
 }
 
 /**
+ * Emits the given tokens, then hangs until aborted. Models a real completion
+ * that the user interrupts partway through.
+ * @param {string[]} tokens - Tokens to emit before hanging.
+ * @param {AbortSignal | undefined} signal - Signal that ends the stream.
+ * @returns {AsyncGenerator} The partial-then-hanging token stream.
+ */
+async function* partialThenHangingStream(
+	tokens: string[],
+	signal?: AbortSignal,
+) {
+	for (const token of tokens) {
+		yield { choices: [{ delta: { content: token } }] };
+	}
+
+	yield* hangingStream(signal);
+}
+
+/**
  * Builds a fully mocked chat handler for route-level tests.
- * @param {object} [options] - Test overrides (decision, per-call streams, history, checkpoint, context config, timeout).
+ * @param {object} [options] - Test overrides (per-call streams, history, checkpoint, context config, timeout).
  * @returns {object} The mocked test harness.
  */
 function createHandler({
-	decision = chatDecision,
 	streams = [() => tokenStream(["Hello", " world"])],
 	history = [
 		{ role: "USER", content: "What is React?" },
@@ -106,8 +123,8 @@ function createHandler({
 	checkpoint = null,
 	contextConfig = relaxedContextConfig,
 	timeoutMs = 1000,
+	attachmentData = {},
 }: {
-	decision?: RoutingDecision;
 	streams?: Array<
 		(
 			signal?: AbortSignal,
@@ -117,12 +134,21 @@ function createHandler({
 	checkpoint?: { content: string; createdAt: Date } | null;
 	contextConfig?: ContextConfig;
 	timeoutMs?: number;
+	/** Base64 payloads keyed by attachment id, backing prisma.attachment.findMany. */
+	attachmentData?: Record<string, string>;
 } = {}) {
-	const inngestSend = mock.fn();
 	const messageCreate = mock.fn(async (args: { data: object }) => ({
 		id: "assistant_1",
 		...args.data,
 	}));
+
+	// Stand-in for Next's `after`, which needs a request scope the tests don't
+	// have. Collecting the promises lets a test await the post-disconnect write.
+	const afterTasks: Array<Promise<void>> = [];
+	const scheduleAfterResponse = (task: () => Promise<void>) => {
+		afterTasks.push(task());
+	};
+	const flushAfterTasks = () => Promise.all(afterTasks);
 
 	let completionCallIndex = 0;
 	const completionCreate = mock.fn(
@@ -133,13 +159,20 @@ function createHandler({
 			return factory(options?.signal);
 		},
 	);
-	const decideRoute = mock.fn(() => decision);
+
+	// Mirrors the real second-phase fetch: only ids the route actually selected.
+	const attachmentFindMany = mock.fn(
+		async (args: { where: { id: { in: string[] } } }) =>
+			args.where.id.in
+				.filter((id) => id in attachmentData)
+				.map((id) => ({ id, mimeType: "image/png", data: attachmentData[id] })),
+	);
 
 	const POST = createChatPostHandler({
 		auth: (async () => ({ userId: "user_1" })) as never,
-		decideRoute: decideRoute as never,
 		timeoutMs,
 		contextConfig,
+		scheduleAfterResponse,
 		createOpenAIClient: async () =>
 			({
 				chat: {
@@ -157,10 +190,19 @@ function createHandler({
 				findMany: mock.fn(async () => history),
 				create: messageCreate,
 			},
+			attachment: {
+				findMany: attachmentFindMany,
+			},
 		} as never,
 	});
 
-	return { POST, completionCreate, decideRoute, inngestSend, messageCreate };
+	return {
+		POST,
+		completionCreate,
+		messageCreate,
+		flushAfterTasks,
+		attachmentFindMany,
+	};
 }
 
 /**
@@ -176,10 +218,25 @@ function completionBodyAt(
 	return completionCreate.mock.calls[index].arguments[0] as CompletionBody;
 }
 
+/**
+ * Narrows a message's content to the string form, failing the test if it isn't.
+ * Messages without images must stay plain strings — asserting that here is part
+ * of the point, not a workaround for the union type.
+ * @param {string | ContentPart[]} content - The content to narrow.
+ * @returns {string} The content as a string.
+ */
+function asText(content: string | ContentPart[]): string {
+	assert.equal(
+		typeof content,
+		"string",
+		"expected plain string content for a message with no attachments",
+	);
+	return content as string;
+}
+
 describe("POST /api/chat", () => {
-	it("streams tokens, persists the assistant message, and does not dispatch Inngest", async () => {
-		const { POST, completionCreate, inngestSend, messageCreate } =
-			createHandler();
+	it("streams tokens and persists the assistant message", async () => {
+		const { POST, completionCreate, messageCreate } = createHandler();
 
 		const response = await POST(createRequest());
 		const text = await response.text();
@@ -197,7 +254,6 @@ describe("POST /api/chat", () => {
 			role: "ASSISTANT",
 			type: "RESULT",
 		});
-		assert.equal(inngestSend.mock.callCount(), 0);
 	});
 
 	it("persists an error message and emits an error event when the stream times out before tokens", async () => {
@@ -221,18 +277,6 @@ describe("POST /api/chat", () => {
 		});
 	});
 
-	it("returns 400 when the server-side guard routes to build", async () => {
-		const { POST, completionCreate, messageCreate } = createHandler({
-			decision: buildDecision,
-		});
-
-		const response = await POST(createRequest("build a dashboard"));
-
-		assert.equal(response.status, 400);
-		assert.equal(completionCreate.mock.callCount(), 0);
-		assert.equal(messageCreate.mock.callCount(), 0);
-	});
-
 	it("replays an existing checkpoint as historical context without compacting", async () => {
 		const { POST, completionCreate, messageCreate } = createHandler({
 			checkpoint: {
@@ -249,12 +293,12 @@ describe("POST /api/chat", () => {
 
 		const body = completionBodyAt(completionCreate, 0);
 		const summaryBlock = body.messages.find((message) =>
-			message.content.startsWith(SUMMARY_PREAMBLE),
+			asText(message.content).startsWith(SUMMARY_PREAMBLE),
 		);
 
 		assert.ok(summaryBlock, "expected a summary context block");
 		assert.equal(summaryBlock?.role, "user");
-		assert.match(summaryBlock?.content ?? "", /CHECKPOINT_SUMMARY/);
+		assert.match(asText(summaryBlock?.content ?? ""), /CHECKPOINT_SUMMARY/);
 		// The checkpoint block comes right after the system prompt.
 		assert.equal(body.messages[0].role, "system");
 		assert.equal(body.messages[1].content, summaryBlock?.content);
@@ -311,26 +355,26 @@ describe("POST /api/chat", () => {
 			summarizerBody.max_tokens,
 			tinyContextConfig.summaryMaxTokens,
 		);
-		assert.match(summarizerBody.messages[1].content, /OLD_QUESTION/);
-		assert.match(summarizerBody.messages[1].content, /OLD_ANSWER/);
+		assert.match(asText(summarizerBody.messages[1].content), /OLD_QUESTION/);
+		assert.match(asText(summarizerBody.messages[1].content), /OLD_ANSWER/);
 
 		const chatBody = completionBodyAt(completionCreate, 1);
 		const summaryBlock = chatBody.messages.find((message) =>
-			message.content.startsWith(SUMMARY_PREAMBLE),
+			asText(message.content).startsWith(SUMMARY_PREAMBLE),
 		);
 
 		assert.ok(summaryBlock, "expected the fresh checkpoint in the chat call");
-		assert.match(summaryBlock?.content ?? "", /Summary text\./);
+		assert.match(asText(summaryBlock?.content ?? ""), /Summary text\./);
 		// The folded head must no longer appear verbatim.
 		assert.ok(
 			chatBody.messages.every(
-				(message) => !message.content.includes("OLD_QUESTION"),
+				(message) => !asText(message.content).includes("OLD_QUESTION"),
 			),
 		);
 		// The tail is kept verbatim.
 		assert.ok(
 			chatBody.messages.some((message) =>
-				message.content.includes("Recent answer"),
+				asText(message.content).includes("Recent answer"),
 			),
 		);
 
@@ -387,5 +431,282 @@ describe("POST /api/chat", () => {
 			role: "ASSISTANT",
 			type: "RESULT",
 		});
+	});
+
+	it("persists the partial answer when the client stops generation mid-stream", async () => {
+		const abortController = new AbortController();
+		const { POST, messageCreate, flushAfterTasks } = createHandler({
+			streams: [
+				(signal) => partialThenHangingStream(["Par", "tial"], signal),
+			],
+			// Long enough that the timeout path can't be what ends the stream.
+			timeoutMs: 10_000,
+		});
+
+		const response = await POST(
+			createRequest("What is React?", abortController.signal),
+		);
+
+		// Drain until both tokens have arrived, then stop like the user would.
+		const reader = response.body!.getReader();
+		const decoder = new TextDecoder();
+		let seen = "";
+
+		while (!seen.includes('"tial"')) {
+			const { value, done } = await reader.read();
+
+			if (done) {
+				break;
+			}
+
+			seen += decoder.decode(value, { stream: true });
+		}
+
+		abortController.abort();
+		await reader.cancel().catch(() => undefined);
+		await flushAfterTasks();
+
+		assert.match(seen, /data: {"token":"Par"}/);
+		assert.equal(messageCreate.mock.callCount(), 1);
+		assert.deepEqual(messageCreate.mock.calls[0].arguments[0].data, {
+			projectId: "project_1",
+			content: "Partial",
+			role: "ASSISTANT",
+			type: "RESULT",
+		});
+	});
+
+	it("persists nothing when the client stops before the first token", async () => {
+		const abortController = new AbortController();
+		const { POST, messageCreate, flushAfterTasks } = createHandler({
+			streams: [(signal) => hangingStream(signal)],
+			timeoutMs: 10_000,
+		});
+
+		const response = await POST(
+			createRequest("What is React?", abortController.signal),
+		);
+
+		const reader = response.body!.getReader();
+		// The immediate "thinking" ack is the only frame that can have arrived.
+		await reader.read();
+
+		abortController.abort();
+		await reader.cancel().catch(() => undefined);
+		await flushAfterTasks();
+
+		// Nothing streamed, so there is no partial answer worth saving — and an
+		// ERROR row would misreport a deliberate stop as a failure.
+		assert.equal(messageCreate.mock.callCount(), 0);
+	});
+
+	it("sends an attached image as an image_url content part", async () => {
+		const { POST, completionCreate, attachmentFindMany } = createHandler({
+			history: [
+				{
+					role: "USER",
+					content: "what is in this image?",
+					attachments: [
+						{ id: "att_1", mimeType: "image/png", width: 1024, height: 1024 },
+					],
+				},
+			],
+			attachmentData: { att_1: "QUJD" },
+		});
+
+		await (await POST(createRequest("what is in this image?"))).text();
+
+		const messages = completionBodyAt(completionCreate, 0).messages;
+		const imageMessage = messages.find((message) =>
+			Array.isArray(message.content),
+		);
+
+		assert.ok(imageMessage, "expected a multipart message");
+		const parts = imageMessage.content as ContentPart[];
+
+		assert.deepEqual(
+			parts.find((part) => part.type === "image_url"),
+			{
+				type: "image_url",
+				image_url: { url: "data:image/png;base64,QUJD", detail: "high" },
+			},
+		);
+		assert.equal(attachmentFindMany.mock.callCount(), 1);
+	});
+
+	it("keeps content a plain string when a message has no attachments", async () => {
+		const { POST, completionCreate, attachmentFindMany } = createHandler();
+
+		await (await POST(createRequest())).text();
+
+		// Regression guard: the string form is what the assertions in the other
+		// cases (and the compaction pipeline) rely on.
+		for (const message of completionBodyAt(completionCreate, 0).messages) {
+			assert.equal(typeof message.content, "string");
+		}
+
+		// And with no images anywhere, the payload table is never queried.
+		assert.equal(attachmentFindMany.mock.callCount(), 0);
+	});
+
+	it("never sends base64 to the summarizer, only an image placeholder", async () => {
+		const base64 = "QUJDREVGRw";
+		const oldQuestion = `OLD_QUESTION ${"q".repeat(400)}`;
+
+		const { POST, completionCreate } = createHandler({
+			contextConfig: tinyContextConfig,
+			history: [
+				{ role: "USER", content: "Recent question" },
+				{ role: "ASSISTANT", content: "Recent answer" },
+				{
+					role: "USER",
+					content: oldQuestion,
+					attachments: [
+						{ id: "att_old", mimeType: "image/png", width: 1024, height: 1024 },
+					],
+				},
+			],
+			attachmentData: { att_old: base64 },
+			streams: [() => tokenStream(["SUMMARY"]), () => tokenStream(["Hello"])],
+		});
+
+		await (await POST(createRequest())).text();
+
+		const summarizerBody = completionBodyAt(completionCreate, 0);
+		const summarizerText = summarizerBody.messages[1].content as string;
+
+		assert.match(summarizerText, /\[image attached: image\/png 1024×1024\]/);
+		assert.equal(
+			summarizerText.includes(base64),
+			false,
+			"summarizer must never receive the base64 payload",
+		);
+	});
+
+	it("counts image tokens toward the compaction trigger", async () => {
+		// Sized so the text alone comfortably fits (the system prompt is most of
+		// it), leaving the image's ~765 tokens as the only thing that can push
+		// this over the trigger.
+		const imageBudgetConfig: ContextConfig = {
+			...tinyContextConfig,
+			contextTokenBudget: 400,
+			reserveOutputTokens: 20,
+		};
+
+		/** Same history either way; only the image presence differs. */
+		const historyFor = (withImage: boolean): HistoryMessage[] => [
+			{ role: "USER", content: "b" },
+			{ role: "ASSISTANT", content: "c" },
+			{
+				role: "USER",
+				content: "a",
+				...(withImage
+					? {
+							attachments: [
+								{
+									id: "att_1",
+									mimeType: "image/png",
+									width: 1024,
+									height: 1024,
+								},
+							],
+						}
+					: {}),
+			},
+		];
+
+		const withoutImage = createHandler({
+			contextConfig: imageBudgetConfig,
+			history: historyFor(false),
+		});
+		await (await withoutImage.POST(createRequest("hi"))).text();
+
+		const withImage = createHandler({
+			contextConfig: imageBudgetConfig,
+			history: historyFor(true),
+			attachmentData: { att_1: "QUJD" },
+			streams: [() => tokenStream(["SUMMARY"]), () => tokenStream(["Hello"])],
+		});
+		await (await withImage.POST(createRequest("hi"))).text();
+
+		// Tiny text alone fits; the image's ~765 tokens push it over the trigger,
+		// which shows up as the extra summarizer call.
+		assert.equal(withoutImage.completionCreate.mock.callCount(), 1);
+		assert.equal(withImage.completionCreate.mock.callCount(), 2);
+	});
+
+	it("caps how many images are sent and degrades the rest to text markers", async () => {
+		const attachmentData: Record<string, string> = {};
+		const history: HistoryMessage[] = [];
+
+		for (let index = 0; index < 6; index += 1) {
+			const id = `att_${index}`;
+			attachmentData[id] = "QUJD";
+			history.push({
+				role: "USER",
+				content: `message ${index}`,
+				attachments: [{ id, mimeType: "image/png", width: 512, height: 512 }],
+			});
+		}
+
+		const { POST, completionCreate, attachmentFindMany } = createHandler({
+			contextConfig: { ...relaxedContextConfig, maxImagesInContext: 2 },
+			history,
+			attachmentData,
+		});
+
+		await (await POST(createRequest("hi"))).text();
+
+		const parts = completionBodyAt(completionCreate, 0)
+			.messages.filter((message) => Array.isArray(message.content))
+			.flatMap((message) => message.content as ContentPart[]);
+
+		assert.equal(parts.filter((part) => part.type === "image_url").length, 2);
+		assert.equal(
+			parts.filter(
+				(part) =>
+					part.type === "text" && part.text.startsWith("[image omitted"),
+			).length,
+			4,
+		);
+		assert.equal(
+			attachmentFindMany.mock.calls[0].arguments[0].where.id.in.length,
+			2,
+		);
+	});
+
+	it("rejects a request with neither text nor attachments", async () => {
+		const { POST } = createHandler();
+
+		const response = await POST(createRequest("   "));
+
+		assert.equal(response.status, 400);
+	});
+
+	it("accepts an image-only message when hasAttachments is set", async () => {
+		const { POST } = createHandler({
+			history: [
+				{
+					role: "USER",
+					content: "",
+					attachments: [
+						{ id: "att_1", mimeType: "image/png", width: 512, height: 512 },
+					],
+				},
+			],
+			attachmentData: { att_1: "QUJD" },
+		});
+
+		const request = new Request("http://localhost/api/chat", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				value: "",
+				projectId: "project_1",
+				hasAttachments: true,
+			}),
+		});
+
+		assert.equal((await POST(request)).status, 200);
 	});
 });

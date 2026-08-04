@@ -21,6 +21,13 @@ interface PlanContextWindowInput<T> {
 	/** Token cost of everything else in the request (system prompt, preamble, new user message). */
 	fixedTokens: number;
 	config: ContextConfig;
+	/**
+	 * Optional non-text token cost per message — currently attached images, whose
+	 * payload deliberately never appears in `content` (a base64 data URL would
+	 * make the chars/4 estimate wildly wrong and trigger compaction forever).
+	 * Omitted, planning behaves exactly as it did before images existed.
+	 */
+	extraTokens?: (message: T) => number;
 }
 
 /**
@@ -38,10 +45,15 @@ export function planContextWindow<T extends { content: string }>({
 	messages,
 	fixedTokens,
 	config,
+	extraTokens,
 }: PlanContextWindowInput<T>): ContextWindowPlan<T> {
+	/** Full cost of a message: its text plus any non-text payload it carries. */
+	const costOf = (message: T) =>
+		estimateMessageTokens(message.content) + (extraTokens?.(message) ?? 0);
+
 	const summaryTokens = summaryContent ? estimateTokens(summaryContent) : 0;
 	const historyTokens = messages.reduce(
-		(total, message) => total + estimateMessageTokens(message.content),
+		(total, message) => total + costOf(message),
 		0,
 	);
 	const estimatedTokens = fixedTokens + summaryTokens + historyTokens;
@@ -79,7 +91,7 @@ export function planContextWindow<T extends { content: string }>({
 
 	while (tailStart > 0) {
 		const candidate = messages[tailStart - 1];
-		const candidateTokens = estimateMessageTokens(candidate.content);
+		const candidateTokens = costOf(candidate);
 		const mustKeep = messages.length - tailStart < config.minKeepMessages;
 
 		if (!mustKeep && tailTokens + candidateTokens > tailAllowance) {

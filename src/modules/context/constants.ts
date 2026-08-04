@@ -16,6 +16,13 @@ export interface ContextConfig {
 	minKeepMessages: number;
 	/** Safety cap on how many messages are fetched from the database. */
 	historyFetchCap: number;
+	/**
+	 * How many of the newest images in the verbatim tail are actually sent to the
+	 * model. Older ones degrade to a text marker — images are the most expensive
+	 * thing in the window, and a long thread of screenshots would otherwise
+	 * crowd out the conversation itself.
+	 */
+	maxImagesInContext: number;
 }
 
 const envInt = (name: string, fallback: number): number => {
@@ -35,6 +42,7 @@ export const DEFAULT_CONTEXT_CONFIG: ContextConfig = {
 	summaryMaxTokens: envInt("CONTEXT_SUMMARY_MAX_TOKENS", 600),
 	minKeepMessages: envInt("CONTEXT_MIN_KEEP_MESSAGES", 2),
 	historyFetchCap: envInt("CONTEXT_HISTORY_FETCH_CAP", 200),
+	maxImagesInContext: envInt("CONTEXT_MAX_IMAGES", 4),
 };
 
 /**
