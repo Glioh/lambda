@@ -9,6 +9,7 @@ import z from "zod";
 import {
 	ACCEPTED_IMAGE_TYPES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
+	MAX_BASE64_CHARS,
 } from "@/modules/attachments/constants";
 import {
 	AttachmentValidationError,
@@ -42,7 +43,7 @@ async function requireProject(projectId: string, userId: string) {
 /** Shape check only — sizes and file signatures are verified in validateAttachments. */
 const attachmentInputSchema = z.object({
 	mimeType: z.enum(ACCEPTED_IMAGE_TYPES),
-	data: z.string().min(1),
+	data: z.string().min(1).max(MAX_BASE64_CHARS, "Image is too large."),
 	width: z.int().positive(),
 	height: z.int().positive(),
 });
@@ -264,7 +265,16 @@ export const messagesRouter = createTRPCRouter({
 			return prisma.$transaction(async (tx) => {
 				const target = await tx.message.findFirst({
 					where: { id: input.messageId, projectId: existingProject.id },
-					select: { id: true, role: true, type: true, createdAt: true },
+					select: {
+						id: true,
+						role: true,
+						type: true,
+						createdAt: true,
+						// Selected up front so retrying your own message can reuse this
+						// row instead of re-reading it below.
+						content: true,
+						attachments: { select: { id: true }, take: 1 },
+					},
 				});
 
 				if (!target) {
@@ -286,13 +296,7 @@ export const messagesRouter = createTRPCRouter({
 				// so the prompt is last, and the client streams a fresh response.
 				const prompt =
 					target.role === "USER"
-						? await tx.message.findFirst({
-								where: { id: target.id },
-								select: {
-									content: true,
-									attachments: { select: { id: true }, take: 1 },
-								},
-							})
+						? target
 						: await tx.message.findFirst({
 								where: {
 									projectId: existingProject.id,

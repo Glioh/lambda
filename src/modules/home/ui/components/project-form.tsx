@@ -101,6 +101,12 @@ export const ProjectForm = () => {
 					)}
 					onDragOver={(event) => event.preventDefault()}
 					onDrop={(event) => {
+						// Ignore drops once the chat is being created — the files would
+						// never make it into the request that's already in flight.
+						if (isPending || isPreparing) {
+							return;
+						}
+
 						if (event.dataTransfer.files?.length) {
 							event.preventDefault();
 							addFiles(event.dataTransfer.files);
@@ -128,6 +134,14 @@ export const ProjectForm = () => {
 								onKeyDown={(e) => {
 									if (e.key === "Enter" && !e.shiftKey) {
 										e.preventDefault();
+
+										// Enter bypasses the disabled submit button, so it has to
+										// re-check the same conditions — otherwise a blank or
+										// still-preparing composer fires a doomed request.
+										if (isButtonDisabled) {
+											return;
+										}
+
 										form.handleSubmit(onSubmit)(e);
 									}
 								}}

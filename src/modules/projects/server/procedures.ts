@@ -11,6 +11,7 @@ import { generateChatTitle } from "./title";
 import {
 	ACCEPTED_IMAGE_TYPES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
+	MAX_BASE64_CHARS,
 } from "@/modules/attachments/constants";
 import {
 	AttachmentValidationError,
@@ -20,7 +21,7 @@ import {
 /** Shape check only — sizes and file signatures are verified in validateAttachments. */
 const attachmentInputSchema = z.object({
 	mimeType: z.enum(ACCEPTED_IMAGE_TYPES),
-	data: z.string().min(1),
+	data: z.string().min(1).max(MAX_BASE64_CHARS, "Image is too large."),
 	width: z.int().positive(),
 	height: z.int().positive(),
 });

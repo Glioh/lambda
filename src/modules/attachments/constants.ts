@@ -28,6 +28,13 @@ export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
  */
 export const MAX_TOTAL_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 
+/**
+ * Longest base64 string that could still decode within MAX_ATTACHMENT_BYTES.
+ * Base64 expands by 4/3 plus up to 4 padding characters. Used to reject
+ * oversized payloads before allocating a buffer to decode them.
+ */
+export const MAX_BASE64_CHARS = Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3) + 4;
+
 /** Longest edge after downscaling; beyond this the model gains no detail. */
 export const MAX_IMAGE_EDGE = 1568;
 

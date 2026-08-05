@@ -2,6 +2,7 @@ import {
 	ACCEPTED_IMAGE_TYPES,
 	MAX_ATTACHMENT_BYTES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
+	MAX_BASE64_CHARS,
 	MAX_TOTAL_ATTACHMENT_BYTES,
 	type UnvalidatedAttachment,
 } from "../constants";
@@ -73,6 +74,14 @@ export function validateAttachments(
 			input.height <= 0
 		) {
 			throw new AttachmentValidationError("Image dimensions are invalid.");
+		}
+
+		// Bound the string before decoding. Buffer.from would happily allocate a
+		// buffer for a 100MB payload first and only then fail the size check below.
+		if (input.data.length > MAX_BASE64_CHARS) {
+			throw new AttachmentValidationError(
+				`Each image must be under ${Math.floor(MAX_ATTACHMENT_BYTES / 1024 / 1024)}MB.`,
+			);
 		}
 
 		const bytes = Buffer.from(input.data, "base64");

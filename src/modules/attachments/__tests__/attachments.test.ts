@@ -48,6 +48,30 @@ describe("validateAttachments", () => {
 		assert.deepEqual(validateAttachments([]), []);
 	});
 
+	it("accepts each allowlisted type's real signature", () => {
+		// WebP in particular checks bytes 0-4 AND 8-12, which is easy to get
+		// wrong; the browser now declares whatever type canvas.toBlob produced,
+		// so all four of these can reach the server.
+		const signatures: Array<[string, number[]]> = [
+			["image/jpeg", [0xff, 0xd8, 0xff, 0xe0]],
+			[
+				"image/webp",
+				[0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
+			],
+			["image/gif", [0x47, 0x49, 0x46, 0x38]],
+		];
+
+		for (const [mimeType, bytes] of signatures) {
+			const data = Buffer.concat([
+				Buffer.from(bytes),
+				Buffer.alloc(16, 0x00),
+			]).toString("base64");
+
+			const [result] = validateAttachments([attachment({ mimeType, data })]);
+			assert.equal(result.mimeType, mimeType);
+		}
+	});
+
 	it("rejects a mime type outside the allowlist", () => {
 		assert.throws(
 			() => validateAttachments([attachment({ mimeType: "text/html" })]),
@@ -85,7 +109,11 @@ describe("validateAttachments", () => {
 				validateAttachments([
 					attachment({ data: pngOfSize(MAX_ATTACHMENT_BYTES + 1024) }),
 				]),
-			AttachmentValidationError,
+			// Asserts the per-image message specifically, so this can't silently
+			// start passing via the total-cap branch instead.
+			(error: Error) =>
+				error instanceof AttachmentValidationError &&
+				/Each image must be under/.test(error.message),
 		);
 	});
 

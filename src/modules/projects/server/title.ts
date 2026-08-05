@@ -109,7 +109,13 @@ export async function generateChatTitle(
 			},
 		);
 
+		// Every failure below returns null so the slug stands, but logs first —
+		// otherwise a persistently broken titler is indistinguishable from chats
+		// that simply haven't been titled yet.
 		if (!response.ok) {
+			console.warn(
+				`Chat title generation failed: ${response.status} ${response.statusText}`,
+			);
 			return null;
 		}
 
@@ -119,9 +125,15 @@ export async function generateChatTitle(
 
 		const raw = payload.choices?.[0]?.message?.content;
 
-		return raw ? sanitizeTitle(raw) : null;
-	} catch {
-		// Timeout, network failure, or malformed JSON — the slug stands.
+		if (!raw) {
+			console.warn("Chat title generation returned no content.");
+			return null;
+		}
+
+		return sanitizeTitle(raw);
+	} catch (error) {
+		// Timeout, network failure, or malformed JSON.
+		console.warn("Chat title generation errored.", error);
 		return null;
 	}
 }

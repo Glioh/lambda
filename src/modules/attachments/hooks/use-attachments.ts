@@ -27,14 +27,17 @@ export interface UseAttachments {
 export function useAttachments(): UseAttachments {
 	const [attachments, setAttachments] = useState<PreparedImage[]>([]);
 	const [isPreparing, setIsPreparing] = useState(false);
-	// Object URLs must be revoked on unmount, and that cleanup needs the *current*
-	// list — but it must not re-run on every change, or it would revoke previews
-	// that are still on screen. A ref mirrored in its own effect gives us both.
+	// The ref, not the state, is the authoritative list. Preparation is async, so
+	// two quick drops can overlap; reading committed state would let the second
+	// batch miss the first. Every mutator writes both, and the ref also gives the
+	// unmount cleanup the current previews without re-running on each change.
 	const attachmentsRef = useRef<PreparedImage[]>([]);
 
-	useEffect(() => {
-		attachmentsRef.current = attachments;
-	}, [attachments]);
+	/** Commits a new list to both the ref and React state. */
+	const commit = useCallback((next: PreparedImage[]) => {
+		attachmentsRef.current = next;
+		setAttachments(next);
+	}, []);
 
 	useEffect(
 		() => () => {
@@ -71,66 +74,84 @@ export function useAttachments(): UseAttachments {
 				return;
 			}
 
-			setAttachments((current) => {
-				const room = MAX_ATTACHMENTS_PER_MESSAGE - current.length;
+			// Decide first, then apply. Running toasts and revokeObjectURL inside a
+			// state updater made them side effects of a function React is free to
+			// call more than once — which double-revoked previews and duplicated
+			// error toasts.
+			const current = attachmentsRef.current;
+			const room = MAX_ATTACHMENTS_PER_MESSAGE - current.length;
+			const accepted: PreparedImage[] = [];
+			const rejected: PreparedImage[] = [];
+			const oversized: string[] = [];
+			let overCount = false;
+			let total = current.reduce((sum, item) => sum + item.byteSize, 0);
 
-				if (room <= 0) {
-					toast.error(
-						`You can attach at most ${MAX_ATTACHMENTS_PER_MESSAGE} images.`,
-					);
-					prepared.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-					return current;
+			for (const item of prepared) {
+				if (accepted.length >= room) {
+					overCount = true;
+					rejected.push(item);
+					continue;
 				}
 
-				const accepted: PreparedImage[] = [];
-				let total = current.reduce((sum, item) => sum + item.byteSize, 0);
-
-				for (const item of prepared) {
-					if (accepted.length >= room) {
-						toast.error(
-							`You can attach at most ${MAX_ATTACHMENTS_PER_MESSAGE} images.`,
-						);
-						URL.revokeObjectURL(item.previewUrl);
-						continue;
-					}
-
-					// Mirror the server's total cap here so the user finds out before
-					// spending time on an upload that would be rejected.
-					if (total + item.byteSize > MAX_TOTAL_ATTACHMENT_BYTES) {
-						toast.error(`${item.fileName} would exceed the total size limit.`);
-						URL.revokeObjectURL(item.previewUrl);
-						continue;
-					}
-
-					total += item.byteSize;
-					accepted.push(item);
+				// Mirror the server's total cap here so the user finds out before
+				// spending time on an upload that would be rejected.
+				if (total + item.byteSize > MAX_TOTAL_ATTACHMENT_BYTES) {
+					oversized.push(item.fileName);
+					rejected.push(item);
+					continue;
 				}
 
-				return accepted.length > 0 ? [...current, ...accepted] : current;
-			});
+				total += item.byteSize;
+				accepted.push(item);
+			}
+
+			for (const item of rejected) {
+				URL.revokeObjectURL(item.previewUrl);
+			}
+
+			// One toast per reason, not one per rejected file.
+			if (overCount) {
+				toast.error(
+					`You can attach at most ${MAX_ATTACHMENTS_PER_MESSAGE} images.`,
+				);
+			}
+
+			if (oversized.length > 0) {
+				toast.error(
+					`${oversized.join(", ")} would exceed the total size limit.`,
+				);
+			}
+
+			if (accepted.length > 0) {
+				commit([...current, ...accepted]);
+			}
 		} finally {
 			setIsPreparing(false);
 		}
-	}, []);
+	}, [commit]);
 
-	const removeAt = useCallback((index: number) => {
-		setAttachments((current) => {
+	const removeAt = useCallback(
+		(index: number) => {
+			const current = attachmentsRef.current;
 			const target = current[index];
 
-			if (target) {
-				URL.revokeObjectURL(target.previewUrl);
+			if (!target) {
+				return;
 			}
 
-			return current.filter((_, i) => i !== index);
-		});
-	}, []);
+			URL.revokeObjectURL(target.previewUrl);
+			commit(current.filter((_, i) => i !== index));
+		},
+		[commit],
+	);
 
 	const clear = useCallback(() => {
-		setAttachments((current) => {
-			current.forEach((item) => URL.revokeObjectURL(item.previewUrl));
-			return [];
-		});
-	}, []);
+		for (const item of attachmentsRef.current) {
+			URL.revokeObjectURL(item.previewUrl);
+		}
+
+		commit([]);
+	}, [commit]);
 
 	const toInput = useCallback(
 		(): AttachmentInput[] =>

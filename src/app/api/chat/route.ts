@@ -17,13 +17,27 @@ import { after } from "next/server";
 import z from "zod";
 
 const CHAT_MODEL = "gpt-4.1";
-const DEFAULT_TIMEOUT_MS = Number(process.env.CHAT_TIMEOUT_MS ?? 45_000);
+
+/**
+ * Reads a positive integer from the environment, falling back when unset or
+ * malformed. Bare `Number()` would turn a typo into NaN, and `setTimeout(NaN)`
+ * fires immediately — a mistyped timeout would abort every request instantly.
+ * @param {string} name - The environment variable to read.
+ * @param {number} fallback - Value used when unset or invalid.
+ * @returns {number} The resolved timeout in milliseconds.
+ */
+const envMs = (name: string, fallback: number): number => {
+	const parsed = Number.parseInt(process.env[name] ?? "", 10);
+	return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const DEFAULT_TIMEOUT_MS = envMs("CHAT_TIMEOUT_MS", 45_000);
 /**
  * Vision requests carrying several images routinely take far longer to first
  * token than text-only ones, so they get a longer leash rather than being
  * killed mid-answer.
  */
-const VISION_TIMEOUT_MS = Number(process.env.CHAT_VISION_TIMEOUT_MS ?? 90_000);
+const VISION_TIMEOUT_MS = envMs("CHAT_VISION_TIMEOUT_MS", 90_000);
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -215,12 +229,24 @@ const toOpenAIRole = (role: "USER" | "ASSISTANT"): "user" | "assistant" =>
 	role === "ASSISTANT" ? "assistant" : "user";
 
 /**
- * Resolves after the configured timeout window. Used to race against the OpenAI completion stream to enforce a maximum response time for the chat route.
+ * Resolves after the configured timeout window. Used to race against the OpenAI
+ * completion stream to enforce a maximum response time for the chat route.
+ *
+ * Returns a `cancel` alongside the promise: losing the race must clear the
+ * timer, or every completed request would hold a live timer (and its closure)
+ * for the rest of the window.
+ * @param {number} timeoutMs - How long to wait before resolving.
+ * @returns {{ promise: Promise<"timeout">; cancel: () => void }} The race entrant.
  */
-const timeoutAfter = (timeoutMs: number) =>
-	new Promise<"timeout">((resolve) => {
-		setTimeout(() => resolve("timeout"), timeoutMs);
+const timeoutAfter = (timeoutMs: number) => {
+	let timer: ReturnType<typeof setTimeout>;
+
+	const promise = new Promise<"timeout">((resolve) => {
+		timer = setTimeout(() => resolve("timeout"), timeoutMs);
 	});
+
+	return { promise, cancel: () => clearTimeout(timer) };
+};
 
 /**
  * Creates the default OpenAI client used by the chat route.
@@ -446,10 +472,6 @@ export function createChatPostHandler(
 		}
 
 		/**
-		 * Builds the provider messages from the (possibly updated) checkpoint
-		 * and the verbatim tail of recent messages.
-		 */
-		/**
 		 * Renders one persisted message as provider content.
 		 *
 		 * Returns a PLAIN STRING when there are no images: the string form is what
@@ -493,6 +515,10 @@ export function createChatPostHandler(
 			return parts;
 		};
 
+		/**
+		 * Builds the provider messages from the (possibly updated) checkpoint and
+		 * the verbatim tail of recent messages.
+		 */
 		const buildMessages = (): ChatCompletionMessage[] => {
 			const messages: ChatCompletionMessage[] = [
 				{ role: "system", content: CHAT_PROMPT },
@@ -540,16 +566,24 @@ export function createChatPostHandler(
 				return;
 			}
 
+			// Claimed before awaiting so concurrent exit paths can't double-write,
+			// but released again on failure — otherwise a rejected insert would
+			// silently block every remaining path from saving the answer at all.
 			persisted = true;
 
-			await dependencies.prisma.message.create({
-				data: {
-					projectId: project.id,
-					content: text,
-					role: "ASSISTANT",
-					type,
-				},
-			});
+			try {
+				await dependencies.prisma.message.create({
+					data: {
+						projectId: project.id,
+						content: text,
+						role: "ASSISTANT",
+						type,
+					},
+				});
+			} catch (error) {
+				persisted = false;
+				throw error;
+			}
 		};
 
 		/** Closing an already-closed or errored controller throws; swallow that. */
@@ -693,17 +727,19 @@ export function createChatPostHandler(
 
 				const completionPromise = runCompletion();
 
-				try {
-					// Tests inject a tiny timeout and no images, so they're unaffected.
-					const effectiveTimeoutMs =
-						selectedImageIds.size > 0
-							? Math.max(dependencies.timeoutMs, VISION_TIMEOUT_MS)
-							: dependencies.timeoutMs;
+				// Tests inject a tiny timeout and no images, so they're unaffected.
+				const effectiveTimeoutMs =
+					selectedImageIds.size > 0
+						? Math.max(dependencies.timeoutMs, VISION_TIMEOUT_MS)
+						: dependencies.timeoutMs;
 
+				const timeout = timeoutAfter(effectiveTimeoutMs);
+
+				try {
 					const result = await Promise.race([
 						completionPromise,
-						timeoutAfter(effectiveTimeoutMs),
-					]);
+						timeout.promise,
+					]).finally(timeout.cancel);
 
 					if (result === "timeout") {
 						abortController.abort();
@@ -720,7 +756,10 @@ export function createChatPostHandler(
 								encodeError("Chat response timed out. Please try again."),
 							);
 						}
-					} else {
+					} else if (content.length > 0) {
+						// Matches the disconnect and timeout paths: an empty completion
+						// has nothing worth saving, and an empty row would render as a
+						// blank answer bubble.
 						await persistOnce(content, "RESULT");
 					}
 

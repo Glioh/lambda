@@ -47,6 +47,7 @@ export const MessageEditForm = ({
 		<div className="w-full max-w-[80%] rounded-lg border bg-sidebar p-3">
 			<TextareaAutosize
 				autoFocus
+				aria-label="Edit message"
 				value={value}
 				disabled={isPending}
 				onChange={(event) => setValue(event.target.value)}

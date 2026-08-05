@@ -110,6 +110,17 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		autoStartAbortRef.current = null;
 	}, []);
 
+	// Unmount-only: switching chats remounts this component (it's keyed by
+	// projectId), and an orphaned stream would keep writing into a view nobody
+	// is looking at. Deliberately separate from the streaming effect so a
+	// dependency change can't abort a stream that is still live.
+	useEffect(
+		() => () => {
+			autoStartAbortRef.current?.abort();
+		},
+		[],
+	);
+
 	// Cache hit — ChatHeader already fetched this project for the title bar.
 	const { data: project } = useQuery(
 		trpc.projects.getOne.queryOptions({ id: projectId }),
@@ -298,17 +309,22 @@ export const MessagesContainer = ({ projectId }: Props) => {
 						isStreaming: false,
 					});
 					toast.error(errorMessage);
+					// Re-arm so a failed auto-start can be retried. This has to live
+					// here: the catch above swallows the error, so a `.catch()` on the
+					// call below could never fire.
+					hasInitializedStreamRef.current = false;
 				} finally {
-					autoStartAbortRef.current = null;
+					// Only clear our own controller — a newer stream may own it now.
+					if (autoStartAbortRef.current === controller) {
+						autoStartAbortRef.current = null;
+					}
 				}
 			};
 
 			streamChatResponse(
 				lastMessage.content,
 				(lastMessage.attachments?.length ?? 0) > 0,
-			).catch(() => {
-				hasInitializedStreamRef.current = false;
-			});
+			);
 		}
 	}, [
 		isLastMessageUser,

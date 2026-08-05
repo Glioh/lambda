@@ -64,7 +64,9 @@ const UserMessage = ({
 						</Card>
 					)}
 					<MessageActions
-						content={content}
+						// An attachment-only message has nothing to copy, so the
+						// action is hidden rather than silently copying "".
+						content={content.trim() ? content : undefined}
 						align="right"
 						onEdit={onStartEdit}
 						// Re-runs this prompt as-is, discarding the answers after it.

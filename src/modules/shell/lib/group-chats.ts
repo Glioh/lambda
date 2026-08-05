@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, isToday, isYesterday } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 
 export interface ChatListEntry {
 	id: string;
@@ -52,17 +52,22 @@ export function groupChatsByRecency(
  * @returns {string} The group label.
  */
 function recencyLabel(updatedAt: Date, now: number): string {
-	if (isToday(updatedAt)) {
+	// Calendar days, not elapsed hours: a chat from 9pm two nights ago belongs in
+	// "Previous 7 Days", not in a bucket decided by what time of day it is now.
+	//
+	// Every bucket is derived from the injected `now`. date-fns `isToday` and
+	// `isYesterday` read the system clock instead, so they ignored `now` entirely
+	// — which made those two buckets untestable and quietly wrong whenever the
+	// caller's reference point wasn't the machine's current date.
+	const days = differenceInCalendarDays(now, updatedAt);
+
+	if (days <= 0) {
 		return "Today";
 	}
 
-	if (isYesterday(updatedAt)) {
+	if (days === 1) {
 		return "Yesterday";
 	}
-
-	// Calendar days, not elapsed hours: a chat from 9pm two nights ago belongs in
-	// "Previous 7 Days", not in a bucket decided by what time of day it is now.
-	const days = differenceInCalendarDays(now, updatedAt);
 
 	if (days <= 7) {
 		return "Previous 7 Days";

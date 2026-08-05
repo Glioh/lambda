@@ -45,14 +45,26 @@ export async function streamChatCompletion(
 	handlers: ChatStreamHandlers,
 	options?: ChatStreamOptions,
 ): Promise<ChatStreamResult> {
-	const response = await fetch("/api/chat", {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-		},
-		body: JSON.stringify(input),
-		signal: options?.signal,
-	});
+	let response: Response;
+
+	try {
+		response = await fetch("/api/chat", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(input),
+			signal: options?.signal,
+		});
+	} catch (error) {
+		// Stopping before the response headers arrive rejects the fetch itself.
+		// That's still a normal stop, not a failure to report.
+		if (options?.signal?.aborted) {
+			return { stopped: true };
+		}
+
+		throw error;
+	}
 
 	if (!response.ok || !response.body) {
 		throw new Error("Unable to start chat response.");

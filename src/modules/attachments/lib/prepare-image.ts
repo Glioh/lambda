@@ -5,8 +5,17 @@ import {
 	MAX_IMAGE_EDGE,
 	MAX_SOURCE_BYTES,
 	REENCODE_QUALITY,
+	type AcceptedImageType,
 	type AttachmentInput,
 } from "../constants";
+
+/**
+ * Narrows a browser-reported mime type to one the server will accept.
+ * @param {string} type - The blob's reported type.
+ * @returns {boolean} True when the type is on the allowlist.
+ */
+const isAcceptedType = (type: string): type is AcceptedImageType =>
+	(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(type);
 
 export interface PreparedImage extends AttachmentInput {
 	byteSize: number;
@@ -75,7 +84,10 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
 		const buffer = await blob.arrayBuffer();
 
 		return {
-			mimeType: "image/webp",
+			// Take the type from the blob, not the requested one. `toBlob` silently
+			// falls back to PNG where WebP encoding isn't supported, and declaring
+			// a type the bytes don't match fails the server's magic-byte check.
+			mimeType: isAcceptedType(blob.type) ? blob.type : "image/webp",
 			data: toBase64(buffer),
 			width,
 			height,

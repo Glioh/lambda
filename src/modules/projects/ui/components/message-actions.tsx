@@ -15,7 +15,8 @@ import { cn } from "@/lib/utils";
 const COPIED_FEEDBACK_MS = 1500;
 
 interface Props {
-	content: string;
+	/** Omit when there's nothing to copy — the copy action is then hidden. */
+	content?: string;
 	/** Retry rolls the thread back to this answer and re-runs the prompt. */
 	onRetry?: () => void;
 	canRetry?: boolean;
@@ -86,6 +87,10 @@ export const MessageActions = ({
 	);
 
 	const handleCopy = useCallback(async () => {
+		if (!content) {
+			return;
+		}
+
 		const ok = await copyText(content);
 
 		if (!ok) {
@@ -113,25 +118,27 @@ export const MessageActions = ({
 				alwaysVisible ? "opacity-100" : "opacity-0 group-hover:opacity-100",
 			)}
 		>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<Button
-						type="button"
-						size="icon"
-						variant="ghost"
-						aria-label={copied ? "Copied" : "Copy message"}
-						onClick={handleCopy}
-						className="size-7 text-muted-foreground hover:text-foreground"
-					>
-						{copied ? (
-							<CheckIcon className="size-3.5" />
-						) : (
-							<CopyIcon className="size-3.5" />
-						)}
-					</Button>
-				</TooltipTrigger>
-				<TooltipContent>{copied ? "Copied" : "Copy"}</TooltipContent>
-			</Tooltip>
+			{content && (
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							type="button"
+							size="icon"
+							variant="ghost"
+							aria-label={copied ? "Copied" : "Copy message"}
+							onClick={handleCopy}
+							className="size-7 text-muted-foreground hover:text-foreground"
+						>
+							{copied ? (
+								<CheckIcon className="size-3.5" />
+							) : (
+								<CopyIcon className="size-3.5" />
+							)}
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent>{copied ? "Copied" : "Copy"}</TooltipContent>
+				</Tooltip>
+			)}
 
 			{onEdit && (
 				<Tooltip>
