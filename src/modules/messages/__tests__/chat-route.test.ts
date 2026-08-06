@@ -573,7 +573,9 @@ describe("POST /api/chat", () => {
 		await (await POST(createRequest())).text();
 
 		const summarizerBody = completionBodyAt(completionCreate, 0);
-		const summarizerText = summarizerBody.messages[1].content as string;
+		// asText also asserts the summarizer input is plain text, never multipart —
+		// which is the actual guarantee this test exists to protect.
+		const summarizerText = asText(summarizerBody.messages[1].content);
 
 		assert.match(summarizerText, /\[image attached: image\/png 1024×1024\]/);
 		assert.equal(

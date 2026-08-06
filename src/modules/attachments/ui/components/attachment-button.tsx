@@ -28,12 +28,17 @@ export const AttachmentButton = ({ onFiles, disabled, isPreparing }: Props) => {
 				multiple
 				className="hidden"
 				onChange={(event) => {
-					if (event.target.files?.length) {
-						onFiles(event.target.files);
-					}
+					// Snapshot before resetting: `files` is a live FileList that the
+					// reset below empties. This is safe today only because the handler
+					// reads it synchronously — copying makes it stay safe.
+					const files = Array.from(event.target.files ?? []);
 
 					// Reset so picking the same file twice in a row still fires change.
 					event.target.value = "";
+
+					if (files.length > 0) {
+						onFiles(files);
+					}
 				}}
 			/>
 			<Button

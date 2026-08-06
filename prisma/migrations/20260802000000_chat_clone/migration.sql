@@ -29,6 +29,14 @@ ALTER TABLE "Attachment"
 -- rename also stamps this column, so the titler never clobbers a user's title.
 ALTER TABLE "Project" ADD COLUMN "titleGeneratedAt" TIMESTAMP(3);
 
+-- DEPLOYMENT NOTE: the three indexes below are built non-concurrently, which
+-- takes an ACCESS EXCLUSIVE lock and blocks writes for the duration. That is
+-- fine on a fresh database (the tables are empty), which is the only way this
+-- migration has been applied. Against an existing populated database, create
+-- them out of band with CREATE INDEX CONCURRENTLY first, then apply this
+-- migration — Prisma runs migrations in a transaction, so CONCURRENTLY cannot
+-- be used inside this file.
+
 -- Sidebar chat list: WHERE "userId" = $1 ORDER BY "updatedAt" DESC.
 CREATE INDEX "Project_userId_updatedAt_idx" ON "Project"("userId", "updatedAt" DESC);
 
