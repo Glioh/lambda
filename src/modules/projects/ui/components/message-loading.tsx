@@ -6,10 +6,8 @@ const messages = [
 	"Loading...",
 	"Generating...",
 	"Analyzing your request...",
-	"Building your website...",
-	"Crafting components...",
-	"Optimizing layout...",
-	"Adding final touches...",
+	"Gathering context...",
+	"Putting it together...",
 	"Almost ready...",
 ];
 

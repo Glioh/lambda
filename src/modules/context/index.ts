@@ -8,6 +8,9 @@ export {
 	estimateTokens,
 	estimateMessageTokens,
 	estimateMessagesTokens,
+	estimateImageTokens,
+	LOW_DETAIL_IMAGE_TOKENS,
+	FALLBACK_IMAGE_TOKENS,
 } from "./tokens";
 export { planContextWindow, type ContextWindowPlan } from "./window";
 export {
@@ -15,5 +18,6 @@ export {
 	buildCompactionMessages,
 	buildSummaryContextBlock,
 	type CompactionSourceMessage,
+	type CompactionSourceAttachment,
 	type CompactionChatMessage,
 } from "./compaction";
