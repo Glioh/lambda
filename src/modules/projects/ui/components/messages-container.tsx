@@ -107,7 +107,6 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	/** Aborts the auto-started stream, if that's the one running. */
 	const stopAutoStartedStream = useCallback(() => {
 		autoStartAbortRef.current?.abort();
-		autoStartAbortRef.current = null;
 	}, []);
 
 	// Unmount-only: switching chats remounts this component (it's keyed by
@@ -116,7 +115,17 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	// dependency change can't abort a stream that is still live.
 	useEffect(
 		() => () => {
-			autoStartAbortRef.current?.abort();
+			const controller = autoStartAbortRef.current;
+
+			if (controller) {
+				// React Strict Mode replays effects as setup -> cleanup -> setup in
+				// development. Re-arm auto-start before aborting so that replay can
+				// replace this lifecycle-cancelled stream. A user stop deliberately
+				// leaves the controller current and is handled as a real stop below.
+				autoStartAbortRef.current = null;
+				hasInitializedStreamRef.current = false;
+				controller.abort();
+			}
 		},
 		[],
 	);
@@ -281,6 +290,16 @@ export const MessagesContainer = ({ projectId }: Props) => {
 					);
 
 					if (wasStopped) {
+						if (autoStartAbortRef.current !== controller) {
+							// Lifecycle cleanup cancelled this attempt. If Strict Mode has
+							// already installed its replacement, leave that preview alone;
+							// otherwise clear ours so the re-armed effect can start again.
+							if (!autoStartAbortRef.current) {
+								setStreamingMessage(null);
+							}
+							return;
+						}
+
 						// Same ordering as MessageForm: latch the stop before the refetch
 						// re-renders a thread that still ends on the user's message.
 						handleStopped();

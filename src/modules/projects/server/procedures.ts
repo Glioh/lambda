@@ -118,24 +118,25 @@ export const projectsRouter = createTRPCRouter({
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
-			// `titleGeneratedAt: null` is the real guard — it makes this a no-op for
-			// chats already titled or manually renamed, including when a rename
-			// lands concurrently with this call.
-			const project = await prisma.project.findFirst({
+			// Claim the one allowed title-generation attempt before calling the model.
+			// updateMany makes the null check atomic, so concurrent callers cannot both
+			// spend an API request generating a title for the same chat.
+			const claimedAt = new Date();
+			const { count: claimedCount } = await prisma.project.updateMany({
 				where: {
 					id: input.id,
 					userId: ctx.auth.userId,
 					titleGeneratedAt: null,
 				},
-				select: { id: true },
+				data: { titleGeneratedAt: claimedAt },
 			});
 
-			if (!project) {
+			if (claimedCount === 0) {
 				return null;
 			}
 
 			const source = await prisma.message.findMany({
-				where: { projectId: project.id, type: { not: "SUMMARY" } },
+				where: { projectId: input.id, type: { not: "SUMMARY" } },
 				orderBy: { createdAt: "asc" },
 				take: 2,
 				select: {
@@ -161,14 +162,18 @@ export const projectsRouter = createTRPCRouter({
 				return null;
 			}
 
-			// Conditional write: loses cleanly to a manual rename that landed while
-			// the model was thinking.
+			// Match this claim's timestamp rather than null. A manual rename stamps a
+			// newer value, so it still wins if it lands while the model is thinking.
 			const { count } = await prisma.project.updateMany({
-				where: { id: project.id, titleGeneratedAt: null },
-				data: { name: title, titleGeneratedAt: new Date() },
+				where: {
+					id: input.id,
+					userId: ctx.auth.userId,
+					titleGeneratedAt: claimedAt,
+				},
+				data: { name: title },
 			});
 
-			return count > 0 ? { id: project.id, name: title } : null;
+			return count > 0 ? { id: input.id, name: title } : null;
 		}),
 
 	// Named `remove` rather than `delete`: the latter is a reserved word and
