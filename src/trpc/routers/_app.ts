@@ -9,4 +9,5 @@ export const appRouter = createTRPCRouter({
 	usage: usageRouter,
 });
 // export type definition of API
+/** Inferred RPC router contract shared with clients. */
 export type AppRouter = typeof appRouter;

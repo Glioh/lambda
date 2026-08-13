@@ -8,6 +8,7 @@ const PRO_POINTS = 100;
 const DURATION = 30 * 24 * 60 * 60; // 30 days in seconds
 const GENERATION_COST = 1;
 
+/** Creates rate limiter configured for current user's subscription tier. */
 export async function getUsageTracker() {
 	const { has } = await auth();
 	const hasProAccess = has?.({ plan: "pro" });
@@ -22,6 +23,7 @@ export async function getUsageTracker() {
 	return usageTracker;
 }
 
+/** Consumes one generation credit for authenticated user. */
 export async function consumeCredits() {
 	// Always authenticate first — disabling metering must not also disable auth.
 	const userId = await resolveUserId();
@@ -39,6 +41,7 @@ export async function consumeCredits() {
 	return result;
 }
 
+/** Returns current credit usage for authenticated user. */
 export async function getUsageStatus() {
 	const userId = await resolveUserId();
 	if (!userId) {

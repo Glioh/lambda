@@ -22,6 +22,7 @@ export const metadata: Metadata = {
 	description: "Chat with Lambda — ask about UI, React, Next.js, and coding.",
 };
 
+/** Provides authentication, RPC, theme, font, and toast context for every route. */
 export default function RootLayout({
 	children,
 }: Readonly<{

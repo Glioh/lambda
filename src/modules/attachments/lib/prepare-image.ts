@@ -17,6 +17,7 @@ import {
 const isAcceptedType = (type: string): type is AcceptedImageType =>
 	(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(type);
 
+/** Browser-normalized image ready for validation and upload. */
 export interface PreparedImage extends AttachmentInput {
 	byteSize: number;
 	/** Object URL for the local preview thumbnail; revoke when discarding. */

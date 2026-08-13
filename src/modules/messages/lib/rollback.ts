@@ -1,5 +1,6 @@
 import type { MessageType } from "@prisma/client";
 
+/** Database operations required to roll conversation back safely. */
 export interface RollbackScope {
 	createdAt: { gt: Date } | { gte: Date };
 }
@@ -33,6 +34,7 @@ export function rollbackScope(
 		: { createdAt: { gt: boundary } };
 }
 
+/** Message boundary and descendants selected for rollback. */
 export interface RollbackCandidate {
 	createdAt: Date;
 	type: MessageType;

@@ -1,3 +1,4 @@
+/** Minimal project state used to decide whether chat should auto-start. */
 export interface AutoStartState {
 	/** The thread currently ends on a USER message. */
 	isLastMessageUser: boolean;

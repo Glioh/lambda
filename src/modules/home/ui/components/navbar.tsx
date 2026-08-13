@@ -8,6 +8,7 @@ import { UserControl } from "@/components/user-control";
 import { useScroll } from "@/hooks/use-scroll";
 import { cn } from "@/lib/utils";
 
+/** Renders responsive marketing navigation and account controls. */
 export const Navbar = () => {
 	const isScrolled = useScroll();
 

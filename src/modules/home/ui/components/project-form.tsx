@@ -24,6 +24,7 @@ const formSchema = z.object({
 	value: z.string().max(10000, "Prompt is too long"),
 });
 
+/** Creates chat project from prompt and optional image attachments. */
 export const ProjectForm = () => {
 	const router = useRouter();
 	const trpc = useTRPC();

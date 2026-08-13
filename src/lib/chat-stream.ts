@@ -1,5 +1,6 @@
 "use client";
 
+/** Callbacks receiving incremental chat stream events. */
 export interface ChatStreamHandlers {
 	/** Called for `event: status` frames (e.g. "thinking", "compacting"). */
 	onStatus?: (status: string) => void;
@@ -9,16 +10,19 @@ export interface ChatStreamHandlers {
 	onError?: (message: string) => void;
 }
 
+/** Controls cancellation and event handling for chat stream consumption. */
 export interface ChatStreamOptions {
 	/** Aborting this stops generation; the server persists whatever streamed. */
 	signal?: AbortSignal;
 }
 
+/** Final assistant output and token usage returned by chat stream. */
 export interface ChatStreamResult {
 	/** True when the caller aborted rather than the stream finishing on its own. */
 	stopped: boolean;
 }
 
+/** Request payload accepted by chat streaming endpoint. */
 export interface ChatStreamInput {
 	value: string;
 	projectId: string;

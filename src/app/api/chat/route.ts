@@ -57,8 +57,10 @@ const inputSchema = z
 		{ message: "Message cannot be empty.", path: ["value"] },
 	);
 
+/** Roles supported by upstream chat-completion API. */
 type ChatRole = "system" | "user" | "assistant";
 
+/** Text or image segment in multimodal chat message. */
 type ContentPart =
 	| { type: "text"; text: string }
 	| {
@@ -66,6 +68,7 @@ type ContentPart =
 			image_url: { url: string; detail: "auto" | "low" | "high" };
 	  };
 
+/** Message payload sent to upstream chat-completion API. */
 interface ChatCompletionMessage {
 	role: ChatRole;
 	/**
@@ -83,6 +86,7 @@ interface HistoryAttachment {
 	height: number;
 }
 
+/** Incremental payload emitted by upstream completion stream. */
 interface StreamChunk {
 	choices?: Array<{
 		delta?: {
@@ -91,8 +95,10 @@ interface StreamChunk {
 	}>;
 }
 
+/** Asynchronous stream of completion chunks. */
 type ChatCompletionStream = AsyncIterable<StreamChunk>;
 
+/** Minimal OpenAI client contract used by chat route. */
 interface OpenAIChatClient {
 	chat: {
 		completions: {
@@ -114,6 +120,7 @@ interface OpenAIChatClient {
 }
 
 // Define a minimal Prisma client interface with only the methods used by the chat route, to avoid coupling to the full PrismaClient type.
+/** Database operations required by chat request lifecycle. */
 interface ChatPrismaClient {
 	project: {
 		findUnique: (args: {
@@ -178,6 +185,7 @@ interface ChatPrismaClient {
 }
 
 // Define the dependencies for the chat route handler, allowing for easier testing and separation of concerns.
+/** Injectable dependencies used to test chat route without external services. */
 interface ChatRouteDependencies {
 	auth: typeof auth;
 	prisma: ChatPrismaClient;

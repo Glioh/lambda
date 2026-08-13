@@ -1,11 +1,13 @@
 import { differenceInCalendarDays, format } from "date-fns";
 
+/** Sidebar chat data required for recency grouping. */
 export interface ChatListEntry {
 	id: string;
 	name: string;
 	updatedAt: Date;
 }
 
+/** Named recency bucket containing ordered sidebar chats. */
 export interface ChatGroup {
 	label: string;
 	chats: ChatListEntry[];

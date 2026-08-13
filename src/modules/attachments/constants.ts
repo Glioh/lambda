@@ -11,6 +11,7 @@ export const ACCEPTED_IMAGE_TYPES = [
 	"image/gif",
 ] as const;
 
+/** MIME type accepted by attachment upload pipeline. */
 export type AcceptedImageType = (typeof ACCEPTED_IMAGE_TYPES)[number];
 
 export const MAX_ATTACHMENTS_PER_MESSAGE = 4;
