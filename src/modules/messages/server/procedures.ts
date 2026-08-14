@@ -48,6 +48,12 @@ const attachmentInputSchema = z.object({
 	height: z.int().positive(),
 });
 
+/**
+ * tRPC router for authenticated message operations within a project.
+ *
+ * Exposes procedures for reading, creating, editing, and retrying messages.
+ * Mounted by the application router under the `messages` namespace.
+ */
 export const messagesRouter = createTRPCRouter({
 	getMany: protectedProcedure
 		.input(

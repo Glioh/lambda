@@ -3,6 +3,11 @@ import { projectsRouter } from "@/modules/projects/server/procedures";
 import { usageRouter } from "@/modules/usage/server/procedures";
 import { createTRPCRouter } from "../init";
 
+/**
+ * Root application tRPC router.
+ *
+ * Mounts message, project, and usage routers under their namespaces.
+ */
 export const appRouter = createTRPCRouter({
 	messages: messagesRouter,
 	projects: projectsRouter,
