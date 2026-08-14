@@ -8,9 +8,9 @@
     "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint .",
-    "test": "node --import tsx --test src/modules/context/__tests__/context.test.ts src/modules/projects/__tests__/auto-start.test.ts src/modules/messages/__tests__/chat-route.test.ts src/modules/messages/__tests__/rollback.test.ts src/modules/attachments/__tests__/attachments.test.ts src/modules/projects/__tests__/title.test.ts src/modules/shell/__tests__/group-chats.test.ts",
+    "test": "node --import tsx --test src/modules/context/__tests__/context.test.ts src/modules/projects/__tests__/auto-start.test.ts src/modules/messages/__tests__/chat-route.test.ts src/modules/messages/__tests__/rollback.test.ts src/modules/attachments/__tests__/attachments.test.ts src/modules/projects/__tests__/title.test.ts src/modules/shell/__tests__/group-chats.test.ts src/modules/chats/server/completion/__tests__/completion.test.ts src/modules/chats/server/completion/__tests__/openai-completion-model.test.ts",
     "test:context": "node --import tsx --test src/modules/context/__tests__/context.test.ts",
-    "test:chat": "node --import tsx --test src/modules/messages/__tests__/chat-route.test.ts",
+    "test:chat": "node --import tsx --test src/modules/messages/__tests__/chat-route.test.ts src/modules/chats/server/completion/__tests__/completion.test.ts src/modules/chats/server/completion/__tests__/openai-completion-model.test.ts",
     "test:attachments": "node --import tsx --test src/modules/attachments/__tests__/attachments.test.ts",
     "test:title": "node --import tsx --test src/modules/projects/__tests__/title.test.ts",
     "test:shell": "node --import tsx --test src/modules/shell/__tests__/group-chats.test.ts"
