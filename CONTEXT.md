@@ -1,19 +1,132 @@
 # Lambda
 
-Lambda organizes a user's work into Project Workspaces containing Chats.
+Lambda is an AI workspace application.
 
-## Language
+A user owns Project Workspaces. Each Project Workspace contains one or more Chats.
+Chats contain Messages and may branch into other Chats.
 
-**Project Workspace**:
-A user-owned workspace that contains Chats and project-level artifacts.
-_Avoid_: Project
+## Canonical language
 
-**Chat**:
-A user-visible discussion owned by exactly one Project Workspace. It owns its messages, attachments, context, and chat-specific results.
-_Avoid_: Conversation, thread
+### Project Workspace
 
-**Branch**:
-A Chat created from a parent Chat at a Branch Point. It evolves independently and may itself have child Branches.
+A user-owned workspace containing Chats and project-level artifacts.
 
-**Branch Point**:
-The Message in a parent Chat where a Branch begins and the two Chats diverge.
+Use: `Project Workspace`
+Avoid using `Project` when referring to the product/domain concept unless referring
+to the current legacy database/code identifier.
+
+### Chat
+
+A user-visible discussion owned by exactly one Project Workspace.
+
+A Chat owns:
+
+- Messages
+- Attachments associated with those Messages
+- Chat history
+- Context checkpoints and summaries
+- Chat-specific execution/results
+
+Use: `Chat`
+Avoid: `Conversation`, `thread`
+
+### Message
+
+A user or assistant turn belonging to exactly one Chat.
+
+Messages must not be shared implicitly between Chats.
+
+### Branch
+
+A Chat created from another Chat at a Branch Point.
+
+A Branch evolves independently from its parent after the branch point and may
+itself have child Branches.
+
+### Branch Point
+
+The Message in the parent Chat where a Branch begins.
+
+## Domain model
+
+Target domain model:
+
+Project Workspace
+├── Chat
+│   ├── Messages
+│   │   └── Attachments
+│   ├── Context / checkpoints
+│   └── child Branches
+│
+└── Chat
+    └── independent Messages / context
+
+Important:
+
+- A Project Workspace may contain many Chats.
+- A Chat belongs to exactly one Project Workspace.
+- A Message belongs to exactly one Chat.
+- Chat history and context are isolated by Chat.
+- One Chat must never implicitly consume Messages or context from another Chat.
+- Deleting a Chat deletes its Chat-owned data.
+- Deleting a Project Workspace deletes its Chats and Project-owned data.
+
+## Current architectural direction
+
+Lambda is moving toward one repository with two independently runnable applications:
+
+lambda/
+├── apps/
+│   ├── web/        # Next.js / React
+│   └── api/        # Fastify / TypeScript
+├── packages/
+└── prisma/
+
+Runtime direction:
+
+Web
+ ↓
+tRPC / HTTP / SSE
+ ↓
+Fastify
+ ↓
+Services
+ ↓
+Repositories / Integrations
+ ↓
+PostgreSQL / external providers
+
+Responsibilities:
+
+- Next.js owns the web application.
+- Fastify owns backend HTTP/server infrastructure.
+- tRPC is a transport for the web client, not the business architecture.
+- Services own Lambda behavior and business rules.
+- Repositories own persistence mechanics.
+- Integrations own communication with external vendors/protocols.
+- Prisma must remain backend-only.
+- Authentication libraries must remain behind a Lambda-owned auth boundary.
+
+## Architecture principles
+
+1. Preserve behavior while migrating architecture.
+2. Keep the architecture simple today and extensible tomorrow.
+3. Prefer conventional, obvious folder names and responsibilities.
+4. Do not introduce abstractions without a current reason for them.
+5. Do not let framework/vendor types leak into Lambda services.
+6. Own Lambda product semantics; use mature infrastructure for commodity mechanics.
+7. Verify exact installed dependency versions and current documentation before
+   implementing architecture-sensitive library code.
+8. Each migration step must leave Lambda runnable and testable.
+
+## Source of truth
+
+For detailed architecture decisions, read:
+
+- `docs/adr/0001-project-workspace-and-conversation-ownership.md`
+- `docs/adr/0002-chat-is-the-canonical-term.md`
+
+If this file conflicts with an accepted ADR, the ADR wins.
+
+Do not infer future architecture solely from current legacy file placement or
+database names.
