@@ -1,22 +1,21 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lambda
+
+Lambda uses npm workspaces for its independently runnable web and API applications.
 
 ## Getting Started
 
-First, run the development server:
+Use Node.js 24 LTS, install dependencies, then start both applications:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Web runs at [http://localhost:3000](http://localhost:3000). API runs at
+[http://localhost:4000](http://localhost:4000), with health available at
+`GET /api/health`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Run either application independently with `npm run dev:web` or `npm run dev:api`.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 

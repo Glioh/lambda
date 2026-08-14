@@ -2,25 +2,31 @@
   "name": "lambda",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace @lambda/web",
+    "dev": "concurrently --kill-others-on-fail --names web,api --prefix-colors blue,green \"npm:dev:web\" \"npm:dev:api\"",
+    "dev:web": "npm run dev --workspace @lambda/web",
+    "dev:api": "npm run dev --workspace @lambda/api",
     "build": "npm run build --workspace @lambda/web",
     "start": "npm run start --workspace @lambda/web",
     "postinstall": "prisma generate",
     "lint": "npm run lint --workspace @lambda/web",
-    "test": "npm run test --workspace @lambda/web",
+    "test": "npm run test --workspaces --if-present",
     "test:context": "npm run test:context --workspace @lambda/web",
     "test:chat": "npm run test:chat --workspace @lambda/web",
     "test:attachments": "npm run test:attachments --workspace @lambda/web",
     "test:title": "npm run test:title --workspace @lambda/web",
     "test:shell": "npm run test:shell --workspace @lambda/web",
-    "typecheck": "npm run typecheck --workspace @lambda/web"
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
+    "concurrently": "^10.0.4",
     "dotenv": "^17.2.3",
     "prisma": "^6.10.1"
   }
