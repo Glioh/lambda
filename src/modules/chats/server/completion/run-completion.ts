@@ -104,19 +104,19 @@ export function runChatCompletion(
 			throw error;
 		}
 	};
+	dependencies.scheduleDeferred(async () => {
+		if (!clientGone || !content) return;
+
+		try {
+			await persistOnce(content, "RESULT");
+		} catch (error) {
+			console.error("Failed to persist partial Chat response.", error);
+		}
+	});
 	const onClientGone = (): void => {
 		if (clientGone) return;
 		clientGone = true;
 		modelController.abort();
-		if (!content) return;
-
-		dependencies.scheduleDeferred(async () => {
-			try {
-				await persistOnce(content, "RESULT");
-			} catch (error) {
-				console.error("Failed to persist partial Chat response.", error);
-			}
-		});
 	};
 	const runModel = async (): Promise<"completed"> => {
 		if (modelController.signal.aborted) {
@@ -195,6 +195,10 @@ export function runChatCompletion(
 					events.push({ kind: "error", message: COMPLETION_TIMEOUT_MESSAGE });
 				}
 			} else if (content) await persistOnce(content, "RESULT");
+			else if (!clientGone) {
+				await persistOnce(COMPLETION_ERROR_MESSAGE, "ERROR");
+				events.push({ kind: "error", message: COMPLETION_ERROR_MESSAGE });
+			}
 
 			if (!clientGone) events.push({ kind: "done" });
 			events.close();
@@ -205,6 +209,7 @@ export function runChatCompletion(
 			}
 
 			if (error instanceof CompletionModelFailure) {
+				console.error("Chat completion model failed.", error.cause);
 				try {
 					if (content) await persistOnce(content, "RESULT");
 					else {

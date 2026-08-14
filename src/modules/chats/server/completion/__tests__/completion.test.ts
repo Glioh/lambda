@@ -89,6 +89,7 @@ const overBudgetHistory = (
 interface HarnessOptions {
 	project?: { id: string } | null;
 	trigger?: PersistedTriggerMessage | null;
+	latestMessageId?: string | null;
 	checkpoint?: { content: string; createdAt: Date } | null;
 	history?: ChatHistoryMessage[];
 	imageData?: Record<string, string>;
@@ -109,6 +110,12 @@ function createHarness(options: HarnessOptions = {}) {
 			options.project === undefined ? { id: "project_1" } : options.project,
 		findMessage: async () =>
 			options.trigger === undefined ? triggerMessage() : options.trigger,
+		findLatestMessage: async () => {
+			const id = options.latestMessageId === undefined
+				? (options.trigger?.id ?? "message_1")
+				: options.latestMessageId;
+			return id ? { id } : null;
+		},
 		findLatestCheckpoint: async () => options.checkpoint ?? null,
 		findHistory: async () => options.history ?? [],
 		findImagePayloads: async (ids) => {
@@ -176,6 +183,7 @@ describe("completeChat", () => {
 		const cases: HarnessOptions[] = [
 			{ project: null },
 			{ trigger: null },
+			{ latestMessageId: "message_2" },
 			{ trigger: triggerMessage({ projectId: "another_project" }) },
 			{ trigger: triggerMessage({ role: "ASSISTANT" }) },
 			{ trigger: triggerMessage({ type: "ERROR" }) },
@@ -209,6 +217,26 @@ describe("completeChat", () => {
 			{ projectId: "project_1", content: "Hello world", type: "RESULT" },
 		]);
 		assert.equal(harness.requests[0].messages.at(-1)?.content, "Prompt");
+	});
+
+	it("persists an error when the model completes without content", async () => {
+		const harness = createHarness({ modelStream: async () => tokens([]) });
+
+		assert.deepEqual(await runHarness(harness), [
+			{ kind: "thinking" },
+			{
+				kind: "error",
+				message: "Something went wrong while generating the response. Please try again.",
+			},
+			{ kind: "done" },
+		]);
+		assert.deepEqual(harness.savedMessages, [
+			{
+				projectId: "project_1",
+				content: "Something went wrong while generating the response. Please try again.",
+				type: "ERROR",
+			},
+		]);
 	});
 
 	it("materializes an exact persisted image-only trigger", async () => {
@@ -291,7 +319,8 @@ describe("completeChat", () => {
 		]);
 	});
 
-	it("turns model failure into one persisted Chat error", async () => {
+	it("turns model failure into one persisted Chat error", async (test) => {
+		const errorLog = test.mock.method(console, "error", () => undefined);
 		const harness = createHarness({
 			modelStream: async () => {
 				throw new Error("provider unavailable");
@@ -304,6 +333,8 @@ describe("completeChat", () => {
 		]);
 		assert.equal(harness.savedMessages.length, 1);
 		assert.equal(harness.savedMessages[0].type, "ERROR");
+		assert.equal(errorLog.mock.callCount(), 1);
+		assert.match(String(errorLog.mock.calls[0].arguments[1]), /provider unavailable/);
 	});
 
 	it("defers exactly one partial-result write after disconnect", async () => {
@@ -457,7 +488,9 @@ describe("completeChat", () => {
 		controller.abort();
 		assert.deepEqual(await iterator.next(), { value: undefined, done: true });
 		assert.deepEqual(harness.savedMessages, []);
-		assert.deepEqual(deferredTasks, []);
+		assert.equal(deferredTasks.length, 1);
+		await deferredTasks[0]();
+		assert.deepEqual(harness.savedMessages, []);
 	});
 
 	it("keeps base64 out of compaction and uses image placeholders", async () => {

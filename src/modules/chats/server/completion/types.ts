@@ -44,6 +44,7 @@ export interface ChatStore {
 		userId: string;
 	}): Promise<{ id: string } | null>;
 	findMessage(messageId: string): Promise<PersistedTriggerMessage | null>;
+	findLatestMessage(projectId: string): Promise<{ id: string } | null>;
 	findLatestCheckpoint(input: {
 		projectId: string;
 		before: Date;

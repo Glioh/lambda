@@ -16,7 +16,7 @@ export interface ChatStreamOptions {
 	signal?: AbortSignal;
 }
 
-/** Final assistant output and token usage returned by chat stream. */
+/** Indicates whether the caller aborted the chat stream. */
 export interface ChatStreamResult {
 	/** True when the caller aborted rather than the stream finishing on its own. */
 	stopped: boolean;

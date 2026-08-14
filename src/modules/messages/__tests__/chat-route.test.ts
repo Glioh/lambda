@@ -77,12 +77,26 @@ describe("POST /api/chat", () => {
 		assert.match(await response.text(), /Project ID is required|Message ID is required/);
 	});
 
+	it("rejects malformed JSON with a 400 response", async () => {
+		const { POST } = createHandler();
+		const response = await POST(
+			new Request("http://localhost/api/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: "{",
+			}),
+		);
+
+		assert.equal(response.status, 400);
+		assert.match(await response.text(), /Invalid JSON body/);
+	});
+
 	it("maps a not-found completion result to a 404 HTTP response", async () => {
 		const { POST } = createHandler({ result: { kind: "not-found" } });
 		const response = await POST(createRequest());
 
 		assert.equal(response.status, 404);
-		assert.match(await response.text(), /Project not found/);
+		assert.match(await response.text(), /Project or message not found/);
 	});
 
 	it("streams SSE events from the completion interface", async () => {

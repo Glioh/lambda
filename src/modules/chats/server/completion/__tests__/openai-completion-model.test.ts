@@ -59,11 +59,37 @@ describe("OpenAICompletionModel", () => {
 		);
 		const fetcher = async () =>
 			new Response(responseBody.body);
-		const model = new OpenAICompletionModel(fetcher as typeof fetch);
+		const model = new OpenAICompletionModel(fetcher as typeof fetch, "key");
 		const stream = await model.stream(request, new AbortController().signal);
 
 		await assert.rejects(collect(stream), /quota exceeded/);
 		assert.equal(responseBody.body.locked, false);
 		assert.equal(responseBody.wasCanceled(), true);
+	});
+
+	it("rejects a missing API key before sending a request", async () => {
+		let called = false;
+		const fetcher = async () => {
+			called = true;
+			return new Response();
+		};
+		const model = new OpenAICompletionModel(fetcher as typeof fetch, "");
+
+		await assert.rejects(
+			model.stream(request, new AbortController().signal),
+			/OPENAI_API_KEY is not configured/,
+		);
+		assert.equal(called, false);
+	});
+
+	it("includes provider status and response details in request failures", async () => {
+		const fetcher = async () =>
+			new Response('{"error":{"message":"quota exceeded"}}', { status: 429 });
+		const model = new OpenAICompletionModel(fetcher as typeof fetch, "key");
+
+		await assert.rejects(
+			model.stream(request, new AbortController().signal),
+			/failed \(429\).*quota exceeded/,
+		);
 	});
 });

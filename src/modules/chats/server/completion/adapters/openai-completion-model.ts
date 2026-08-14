@@ -76,6 +76,10 @@ export class OpenAICompletionModel implements ChatCompletionModel {
 	) {}
 
 	async stream(request: ChatCompletionRequest, signal: AbortSignal) {
+		if (!this.apiKey) {
+			throw new Error("OPENAI_API_KEY is not configured.");
+		}
+
 		const response = await this.fetcher(
 			"https://api.openai.com/v1/chat/completions",
 			{
@@ -98,7 +102,12 @@ export class OpenAICompletionModel implements ChatCompletionModel {
 		);
 
 		if (!response.ok || !response.body) {
-			throw new Error("OpenAI Chat completion request failed.");
+			const detail = response.ok
+				? "response body missing"
+				: await response.text().catch(() => "response body unavailable");
+			throw new Error(
+				`OpenAI Chat completion request failed (${response.status}): ${detail.slice(0, 500)}`,
+			);
 		}
 
 		return parseOpenAIStream(response.body);

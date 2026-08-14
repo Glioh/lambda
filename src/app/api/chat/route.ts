@@ -55,7 +55,14 @@ export function createChatPostHandler(
 			return Response.json({ error: "Not authenticated" }, { status: 401 });
 		}
 
-		const parsedInput = inputSchema.safeParse(await request.json());
+		let body: unknown;
+		try {
+			body = await request.json();
+		} catch {
+			return Response.json({ error: "Invalid JSON body." }, { status: 400 });
+		}
+
+		const parsedInput = inputSchema.safeParse(body);
 		if (!parsedInput.success) {
 			return Response.json(
 				{ error: parsedInput.error.flatten() },
@@ -72,7 +79,10 @@ export function createChatPostHandler(
 		});
 
 		if (result.kind === "not-found") {
-			return Response.json({ error: "Project not found." }, { status: 404 });
+			return Response.json(
+				{ error: "Project or message not found." },
+				{ status: 404 },
+			);
 		}
 
 		const stream = new ReadableStream<Uint8Array>({

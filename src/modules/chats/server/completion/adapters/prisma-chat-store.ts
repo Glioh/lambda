@@ -31,6 +31,14 @@ export class PrismaChatStore implements ChatStore {
 		});
 	}
 
+	findLatestMessage(projectId: string) {
+		return this.prisma.message.findFirst({
+			where: { projectId, type: { not: "SUMMARY" } },
+			orderBy: { createdAt: "desc" },
+			select: { id: true },
+		});
+	}
+
 	findLatestCheckpoint({ projectId, before }: { projectId: string; before: Date }) {
 		return this.prisma.message.findFirst({
 			where: { projectId, type: "SUMMARY", createdAt: { lt: before } },

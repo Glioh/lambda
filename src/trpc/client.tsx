@@ -23,7 +23,7 @@ function getQueryClient() {
   if (!browserQueryClient) browserQueryClient = makeQueryClient();
   return browserQueryClient;
 }
-/** Resolves absolute RPC endpoint for browser, preview, and server runtimes. */
+/** Uses a relative RPC path in browsers and NEXT_PUBLIC_APP_URL on the server. */
 function getUrl() {
   const base = (() => {
     if (typeof window !== 'undefined') return '';

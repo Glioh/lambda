@@ -1,6 +1,6 @@
 import type { MessageType } from "@prisma/client";
 
-/** Database operations required to roll chat back safely. */
+/** `createdAt` filter that selects the rows a chat rollback discards. */
 export interface RollbackScope {
 	createdAt: { gt: Date } | { gte: Date };
 }
