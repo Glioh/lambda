@@ -2,7 +2,7 @@ import type { ContextConfig } from "./constants";
 import { compactionTriggerTokens } from "./constants";
 import { estimateMessageTokens, estimateTokens } from "./tokens";
 
-/** Partition of conversation history selected for model context window. */
+/** Partition of chat history selected for model context window. */
 export interface ContextWindowPlan<T> {
 	/** True when the estimated request size exceeds the compaction trigger. */
 	needsCompaction: boolean;

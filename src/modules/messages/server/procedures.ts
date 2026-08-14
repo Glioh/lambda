@@ -65,7 +65,7 @@ export const messagesRouter = createTRPCRouter({
 				},
 				// createdAt, not updatedAt: compaction backdates createdAt on SUMMARY
 				// rows so the checkpoint divider renders at the fold rather than at the
-				// end of the thread. On the exact tie, MessageType's declaration order
+				// end of the chat. On the exact tie, MessageType's declaration order
 				// (RESULT, ERROR, SUMMARY) sorts the checkpoint after the last folded
 				// message, which is where it belongs.
 				orderBy: [{ createdAt: "asc" }, { type: "asc" }],
@@ -169,12 +169,12 @@ export const messagesRouter = createTRPCRouter({
 		}),
 
 	/**
-	 * Rewrites a user turn and rolls the thread back to it.
+	 * Rewrites a user turn and rolls the chat back to it.
 	 *
 	 * Everything after the edited message is deleted, including SUMMARY rows.
 	 * That is deliberate and differs from {@link retryFrom}: a checkpoint dated
 	 * after the edit point folded messages that no longer exist, so keeping it
-	 * would replay a summary of a conversation that never happened. Dropping it
+	 * would replay a summary of a chat that never happened. Dropping it
 	 * simply promotes the previous checkpoint, whose folded messages are all
 	 * still valid history.
 	 */
@@ -242,11 +242,11 @@ export const messagesRouter = createTRPCRouter({
 		}),
 
 	/**
-	 * Rolls the thread back to a message and hands back the prompt to re-run.
+	 * Rolls the chat back to a message and hands back the prompt to re-run.
 	 *
 	 * Anchored on an answer, that answer is replaced. Anchored on your own
 	 * message, that message is kept and re-sent unchanged. Works anywhere in the
-	 * thread, and on ERROR rows — which are otherwise dead ends the user can only
+	 * chat, and on ERROR rows — which are otherwise dead ends the user can only
 	 * escape by retyping.
 	 */
 	retryFrom: usageProtectedProcedure
@@ -292,7 +292,7 @@ export const messagesRouter = createTRPCRouter({
 				}
 
 				// Retrying an answer re-runs the prompt behind it; retrying your own
-				// message re-runs that message. Either way the thread is rolled back
+				// message re-runs that message. Either way the chat is rolled back
 				// so the prompt is last, and the client streams a fresh response.
 				const prompt =
 					target.role === "USER"

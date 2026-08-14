@@ -222,7 +222,7 @@ describe("buildCompactionMessages", () => {
 		assert.equal(messages.length, 2);
 		assert.equal(messages[0].role, "system");
 		assert.equal(messages[1].role, "user");
-		assert.match(messages[1].content, /<conversation_to_summarize>/);
+		assert.match(messages[1].content, /<chat_to_summarize>/);
 		assert.match(messages[1].content, /User: Build me a site/);
 		assert.match(messages[1].content, /Assistant: Sure, here it is/);
 		assert.doesNotMatch(messages[1].content, /<previous_summary>/);

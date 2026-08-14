@@ -17,7 +17,7 @@ const COPIED_FEEDBACK_MS = 1500;
 interface Props {
 	/** Omit when there's nothing to copy — the copy action is then hidden. */
 	content?: string;
-	/** Retry rolls the thread back to this answer and re-runs the prompt. */
+	/** Retry rolls the chat back to this answer and re-runs the prompt. */
 	onRetry?: () => void;
 	canRetry?: boolean;
 	/** Editing is offered on user turns; retry on assistant turns. */

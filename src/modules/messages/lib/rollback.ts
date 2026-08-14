@@ -1,18 +1,18 @@
 import type { MessageType } from "@prisma/client";
 
-/** Database operations required to roll conversation back safely. */
+/** Database operations required to roll chat back safely. */
 export interface RollbackScope {
 	createdAt: { gt: Date } | { gte: Date };
 }
 
 /**
- * Rows to discard when rolling the thread back to a point.
+ * Rows to discard when rolling the chat back to a point.
  *
  * SUMMARY checkpoints are deleted alongside everything else, and that is the
  * whole subtlety here. A checkpoint's `createdAt` is backdated to the newest
  * message it folded, so a checkpoint at or after the boundary summarizes
  * content this rollback is about to delete — replaying it would describe a
- * conversation that no longer exists. Deleting it simply promotes the previous
+ * chat that no longer exists. Deleting it simply promotes the previous
  * checkpoint, whose folded messages all predate the boundary and are untouched;
  * the window just becomes less compact until compaction runs again.
  *
@@ -50,10 +50,10 @@ export const ROLLBACK_EDGE_BY_ROLE = {
 
 /**
  * Applies a scope in memory, returning the rows that would survive.
- * Exists so the rules above can be exercised against realistic threads without
+ * Exists so the rules above can be exercised against realistic chat histories without
  * a database.
  *
- * @param {T[]} messages - The thread, oldest first.
+ * @param {T[]} messages - Chat messages, oldest first.
  * @param {RollbackScope} scope - The scope to apply.
  * @returns {T[]} The surviving messages.
  */

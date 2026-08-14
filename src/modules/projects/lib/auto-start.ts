@@ -1,6 +1,6 @@
 /** Minimal project state used to decide whether chat should auto-start. */
 export interface AutoStartState {
-	/** The thread currently ends on a USER message. */
+	/** The chat currently ends on a USER message. */
 	isLastMessageUser: boolean;
 	/** A response preview is on screen (streaming, or frozen after a stop). */
 	hasStreamingMessage: boolean;
@@ -14,12 +14,12 @@ export interface AutoStartState {
  * Decides whether the chat view should automatically stream an answer.
  *
  * This exists for the handoff case: the home page creates the project with the
- * first user message and navigates, so the chat view arrives at a thread that
+ * first user message and navigates, so the chat view arrives at a chat that
  * ends on a USER message with no answer coming. It starts one.
  *
  * The subtlety — and the source of a real bug — is that a *stopped* turn looks
  * identical: the server persists only what streamed, so an interrupted turn also
- * leaves the thread ending on a USER message. Reading that as "unanswered"
+ * leaves the chat ending on a USER message. Reading that as "unanswered"
  * re-runs the prompt the user just interrupted. `stopped` is what distinguishes
  * the two, and it is cleared when the user sends again or regenerates.
  *

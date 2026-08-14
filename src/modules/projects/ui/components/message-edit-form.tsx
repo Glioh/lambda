@@ -16,7 +16,7 @@ interface Props {
 /**
  * Inline editor that replaces a user message bubble while it's being rewritten.
  *
- * Saving rolls the thread back to this turn and re-runs it, so the button says
+ * Saving rolls the chat back to this turn and re-runs it, so the button says
  * what actually happens rather than "Save".
  *
  * @param {Props} props - The editor props.

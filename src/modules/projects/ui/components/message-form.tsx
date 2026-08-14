@@ -122,7 +122,7 @@ export const MessageForm = ({
 				{ signal: controller.signal },
 			);
 
-			// Report the stop BEFORE refetching. The refetch re-renders the thread
+			// Report the stop BEFORE refetching. The refetch re-renders the chat
 			// still ending on the user's message, which the container reads as
 			// "unanswered" — it has to know a stop happened first, or it re-streams
 			// the prompt the user just interrupted.

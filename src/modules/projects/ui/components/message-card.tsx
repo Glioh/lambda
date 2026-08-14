@@ -84,7 +84,7 @@ interface SummaryDividerProps {
 }
 
 /**
- * Renders a compaction checkpoint as an expandable divider in the thread.
+ * Renders a compaction checkpoint as an expandable divider in the chat.
  * @param {SummaryDividerProps} props - The summary divider props.
  * @returns {JSX.Element} The rendered compaction divider.
  */
@@ -94,7 +94,7 @@ const SummaryDivider = ({ content }: SummaryDividerProps) => {
 			<details className="group/summary rounded-lg border border-dashed bg-muted/30 px-3 py-2">
 				<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground">
 					<SparklesIcon className="size-3.5 shrink-0" />
-					<span className="font-medium">Conversation compacted</span>
+					<span className="font-medium">Chat compacted</span>
 					<span className="hidden sm:inline opacity-70">
 						— earlier messages summarized
 					</span>
@@ -196,9 +196,9 @@ interface MessageCardProps {
 	type: MessageType;
 	isStreaming?: boolean;
 	statusLabel?: string;
-	/** The newest message in the thread: pins its action row open. */
+	/** The newest message in the chat: pins its action row open. */
 	isLast?: boolean;
-	/** Rolls the thread back to this answer and re-runs the prompt behind it. */
+	/** Rolls the chat back to this answer and re-runs the prompt behind it. */
 	onRetry?: () => void;
 	canRetry?: boolean;
 	attachments?: MessageAttachment[];

@@ -101,7 +101,7 @@ const RenameForm = ({ chatId, currentName, onDone }: FormProps) => {
 			<DialogHeader>
 				<DialogTitle>Rename chat</DialogTitle>
 				<DialogDescription>
-					Give this conversation a name you&apos;ll recognize later.
+					Give this chat a name you&apos;ll recognize later.
 				</DialogDescription>
 			</DialogHeader>
 			<div className="py-4">

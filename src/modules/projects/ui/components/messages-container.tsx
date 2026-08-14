@@ -17,7 +17,7 @@ import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { shouldAutoStartResponse } from "@/modules/projects/lib/auto-start";
 import { toast } from "sonner";
 
-/** Poll cadence while a response is in flight. Idle threads don't poll at all. */
+/** Poll cadence while a response is in flight. Idle chats don't poll at all. */
 const STREAMING_POLL_MS = 1500;
 
 interface Props {
@@ -43,7 +43,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	} | null>(null);
 	// True from the moment the user presses stop until they send again.
 	//
-	// This is load-bearing: a stopped turn leaves the thread ending on a USER
+	// This is load-bearing: a stopped turn leaves the chat ending on a USER
 	// message, which is exactly the shape the auto-start effect below treats as
 	// "needs an answer". Without this flag it immediately re-streams the prompt
 	// the user just interrupted.
@@ -59,7 +59,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 			{
 				// Only poll while a response is actually in flight. Idle polling
 				// re-serialized the whole transcript every 1.5s forever, which grows
-				// with the conversation and buys nothing once the answer has landed.
+				// with the chat and buys nothing once the answer has landed.
 				refetchInterval: streamingMessage ? STREAMING_POLL_MS : false,
 				staleTime: 5_000,
 			},
@@ -92,7 +92,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 
 	// Swap the frozen preview for the persisted row the moment it arrives.
 	//
-	// Keyed off "the thread no longer ends on a USER message" rather than a
+	// Keyed off "the chat no longer ends on a USER message" rather than a
 	// message count: counting raced the refetch that MessageForm already performs
 	// before reporting the stop, which could leave the preview stuck on screen
 	// next to an identical saved row.
@@ -178,7 +178,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	/**
 	 * Shared tail of every rollback (retry and edit alike).
 	 *
-	 * The re-stream isn't kicked off here: once the rollback lands, the thread
+	 * The re-stream isn't kicked off here: once the rollback lands, the chat
 	 * ends on a USER message, which is exactly the state the auto-start effect
 	 * below already handles. Clearing the stop latch and the init guard is what
 	 * re-arms it.
@@ -207,7 +207,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		[router],
 	);
 
-	/** Rolls the thread back to an answer and re-runs the prompt behind it. */
+	/** Rolls the chat back to an answer and re-runs the prompt behind it. */
 	const handleRetry = useCallback(
 		(messageId: string) => {
 			retryFrom.mutate(
@@ -218,7 +218,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		[retryFrom, projectId, afterRollback, onRollbackError],
 	);
 
-	// One in-flight rollback at a time: both mutations truncate the thread, so
+	// One in-flight rollback at a time: both mutations truncate the chat, so
 	// letting a second start mid-flight would race two different rollback points.
 	const isRollbackBusy =
 		!!streamingMessage || retryFrom.isPending || editAndResend.isPending;
@@ -301,7 +301,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 						}
 
 						// Same ordering as MessageForm: latch the stop before the refetch
-						// re-renders a thread that still ends on the user's message.
+						// re-renders a chat that still ends on the user's message.
 						handleStopped();
 						await queryClient.invalidateQueries(
 							trpc.messages.getMany.queryOptions({ projectId }),
@@ -400,7 +400,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 							isStreaming={streamingMessage.isStreaming}
 							statusLabel={
 								streamingMessage.status === "compacting"
-									? "Compacting conversation…"
+									? "Compacting chat…"
 									: undefined
 							}
 						/>

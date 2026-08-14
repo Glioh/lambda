@@ -659,7 +659,7 @@ export function createChatPostHandler(
 					const openai = await dependencies.createOpenAIClient();
 
 					if (plan.needsCompaction) {
-						// Fold the head of the conversation into a checkpoint before
+						// Fold the head of the chat into a checkpoint before
 						// answering. Failure here must never block the user's answer —
 						// we fall back to sending the tail without an updated summary.
 						safeEnqueue(encodeStatus("compacting"));
