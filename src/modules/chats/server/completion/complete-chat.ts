@@ -10,14 +10,15 @@ export function createCompleteChat(
 	dependencies: CompleteChatDependencies,
 ): CompleteChat {
 	return async ({ userId, projectId, messageId, signal }) => {
-		const [project, triggerMessage, latestMessage] = await Promise.all([
-			dependencies.store.findProject({ projectId, userId }),
+		const project = await dependencies.store.findProject({ projectId, userId });
+		if (!project) return { kind: "not-found" };
+
+		const [triggerMessage, latestMessage] = await Promise.all([
 			dependencies.store.findMessage(messageId),
 			dependencies.store.findLatestMessage(projectId),
 		]);
 
 		if (
-			!project ||
 			!triggerMessage ||
 			latestMessage?.id !== triggerMessage.id ||
 			triggerMessage.projectId !== project.id ||

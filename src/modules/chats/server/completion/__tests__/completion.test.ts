@@ -90,6 +90,8 @@ interface HarnessOptions {
 	project?: { id: string } | null;
 	trigger?: PersistedTriggerMessage | null;
 	latestMessageId?: string | null;
+	onFindMessage?: () => void;
+	onFindLatestMessage?: () => void;
 	checkpoint?: { content: string; createdAt: Date } | null;
 	history?: ChatHistoryMessage[];
 	imageData?: Record<string, string>;
@@ -108,9 +110,12 @@ function createHarness(options: HarnessOptions = {}) {
 	const store: ChatStore = {
 		findProject: async () =>
 			options.project === undefined ? { id: "project_1" } : options.project,
-		findMessage: async () =>
-			options.trigger === undefined ? triggerMessage() : options.trigger,
+		findMessage: async () => {
+			options.onFindMessage?.();
+			return options.trigger === undefined ? triggerMessage() : options.trigger;
+		},
 		findLatestMessage: async () => {
+			options.onFindLatestMessage?.();
 			const id = options.latestMessageId === undefined
 				? (options.trigger?.id ?? "message_1")
 				: options.latestMessageId;
@@ -201,6 +206,30 @@ describe("completeChat", () => {
 				{ kind: "not-found" },
 			);
 		}
+	});
+
+	it("does not read Message state before Project Workspace authorization", async () => {
+		let messageReads = 0;
+		const harness = createHarness({
+			project: null,
+			onFindMessage: () => {
+				messageReads += 1;
+			},
+			onFindLatestMessage: () => {
+				messageReads += 1;
+			},
+		});
+
+		assert.deepEqual(
+			await harness.completeChat({
+				userId: "user_1",
+				projectId: "project_1",
+				messageId: "message_1",
+				signal: new AbortController().signal,
+			}),
+			{ kind: "not-found" },
+		);
+		assert.equal(messageReads, 0);
 	});
 
 	it("streams ordered events and persists one assistant result", async () => {

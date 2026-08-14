@@ -74,7 +74,12 @@ describe("POST /api/chat", () => {
 		const response = await POST(createRequest({ projectId: "", messageId: "" }));
 
 		assert.equal(response.status, 400);
-		assert.match(await response.text(), /Project ID is required|Message ID is required/);
+		const body = await response.json();
+		assert.equal(body.error, "Invalid request body.");
+		assert.match(
+			JSON.stringify(body.details),
+			/Project ID is required|Message ID is required/,
+		);
 	});
 
 	it("rejects malformed JSON with a 400 response", async () => {

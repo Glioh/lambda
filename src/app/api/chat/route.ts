@@ -65,7 +65,10 @@ export function createChatPostHandler(
 		const parsedInput = inputSchema.safeParse(body);
 		if (!parsedInput.success) {
 			return Response.json(
-				{ error: parsedInput.error.flatten() },
+				{
+					error: "Invalid request body.",
+					details: parsedInput.error.flatten(),
+				},
 				{ status: 400 },
 			);
 		}
