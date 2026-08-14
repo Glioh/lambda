@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { DEV_FAKE_USER_ID, DEV_NO_AUTH } from "@/lib/dev-auth";
 import type {
+	ChatCompletionEvent,
 	ChatCompletionResult,
 	CompleteChatInput,
 } from "@/modules/chats/server/completion";
@@ -88,60 +89,85 @@ export function createChatPostHandler(
 			);
 		}
 
-		const stream = new ReadableStream<Uint8Array>({
-			start(controller) {
-				const pump = async () => {
-					try {
-						for await (const event of result.events) {
-							switch (event.kind) {
-								case "thinking":
-									controller.enqueue(encodeStatus("thinking"));
-									break;
-								case "compacting":
-									controller.enqueue(encodeStatus("compacting"));
-									break;
-								case "token":
-									controller.enqueue(encodeData({ token: event.token }));
-									break;
-								case "error":
-									controller.enqueue(encodeError(event.message));
-									break;
-								case "done":
-									controller.enqueue(encodeData("[DONE]"));
-									controller.close();
+			let iterator: AsyncIterator<ChatCompletionEvent> | null = null;
+			let cancelled = false;
+			const stream = new ReadableStream<Uint8Array>({
+				start(controller) {
+					iterator = result.events[Symbol.asyncIterator]();
+					const enqueue = (data: Uint8Array): boolean => {
+						if (cancelled || request.signal.aborted) return false;
+						try {
+							controller.enqueue(data);
+							return true;
+						} catch {
+							cancelled = true;
+							return false;
+						}
+					};
+					const close = () => {
+						try {
+							controller.close();
+						} catch {
+							// Consumer already cancelled or stream already closed.
+						}
+					};
+					const pump = async () => {
+						try {
+							while (!cancelled && !request.signal.aborted) {
+								const next = await iterator?.next();
+								if (!next || next.done) {
+									enqueue(encodeData("[DONE]"));
+									close();
 									return;
+								}
+								const event = next.value;
+								switch (event.kind) {
+									case "thinking":
+										enqueue(encodeStatus("thinking"));
+										break;
+									case "compacting":
+										enqueue(encodeStatus("compacting"));
+										break;
+									case "token":
+										enqueue(encodeData({ token: event.token }));
+										break;
+									case "error":
+										enqueue(encodeError(event.message));
+										break;
+									case "done":
+										enqueue(encodeData("[DONE]"));
+										close();
+										return;
 								default:
 									break;
 								}
 						}
 
-						controller.enqueue(encodeData("[DONE]"));
-						controller.close();
-					} catch {
-						if (request.signal.aborted) {
-							try {
-								controller.close();
-							} catch {
-								// Already closed.
-							}
-							return;
-						}
-
-						controller.enqueue(
-							encodeError("Something went wrong. Please try again."),
-						);
-						controller.enqueue(encodeData("[DONE]"));
-						try {
-							controller.close();
 						} catch {
-							// Already closed.
-						}
-					}
-				};
+							if (cancelled || request.signal.aborted) {
+								close();
+								return;
+							}
 
-				void pump();
-			},
-		});
+							enqueue(
+								encodeError("Something went wrong. Please try again."),
+							);
+							enqueue(encodeData("[DONE]"));
+							close();
+						} finally {
+							iterator = null;
+						}
+					};
+
+					void pump();
+				},
+				cancel() {
+					cancelled = true;
+					const activeIterator = iterator;
+					iterator = null;
+					void activeIterator?.return?.().catch(() => undefined);
+				},
+			});
 
 		return new Response(stream, {
 			headers: {

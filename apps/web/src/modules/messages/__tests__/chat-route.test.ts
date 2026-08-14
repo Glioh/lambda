@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createChatPostHandler } from "@/app/api/chat/route";
+import {
+	createChatPostHandler,
+	type ChatRouteDependencies,
+} from "@/app/api/chat/route";
 import type {
 	ChatCompletionEvent,
+	ChatCompletionResult,
 	CompleteChatInput,
 } from "@/modules/chats/server/completion";
 
@@ -27,14 +31,16 @@ function createHandler(options: {
 	const authUserId =
 		options.authUserId === undefined ? "user_1" : options.authUserId;
 	const POST = createChatPostHandler({
-		auth: (async () => ({ userId: authUserId })) as any,
-		completeChat: (async (input: CompleteChatInput) => {
+		auth: (async () => ({ userId: authUserId })) as unknown as ChatRouteDependencies["auth"],
+		completeChat: async (
+			input: CompleteChatInput,
+		): Promise<ChatCompletionResult> => {
 			calls.push({
 				userId: input.userId,
 				projectId: input.projectId,
 				messageId: input.messageId,
 			});
-			if (options.result) return options.result as any;
+			if (options.result) return options.result;
 			return {
 				kind: "started",
 				events: (async function* (): AsyncIterable<ChatCompletionEvent> {
@@ -43,7 +49,7 @@ function createHandler(options: {
 					yield { kind: "done" };
 				})(),
 			};
-		}) as any,
+		},
 	});
 
 	return { POST, calls };
@@ -126,5 +132,39 @@ describe("POST /api/chat", () => {
 		assert.match(text, /data: \{"token":"Hello"\}/);
 		assert.match(text, /event: error\ndata: \{"error":"Nope"\}/);
 		assert.match(text, /data: \[DONE\]/);
+	});
+
+	it("cancels the completion iterator when the response consumer disconnects", async () => {
+		let released = false;
+		let reads = 0;
+		const { POST } = createHandler({
+			result: {
+				kind: "started",
+				events: {
+					[Symbol.asyncIterator]() {
+						return {
+							next: async () =>
+								reads++ === 0
+									? { value: { kind: "thinking" } as const, done: false }
+									: new Promise<IteratorResult<ChatCompletionEvent>>(
+										() => undefined,
+									),
+							return: async () => {
+								released = true;
+								return { value: undefined, done: true };
+							},
+						};
+					},
+				},
+			},
+		});
+
+		const response = await POST(createRequest());
+		const reader = response.body?.getReader();
+		assert.ok(reader);
+		await reader.read();
+		await reader.cancel();
+
+		assert.equal(released, true);
 	});
 });

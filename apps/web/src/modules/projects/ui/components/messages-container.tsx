@@ -14,7 +14,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MessageType } from "@prisma/client";
 import { MessageLoading } from "./message-loading";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
-import { shouldAutoStartResponse } from "@/modules/projects/lib/auto-start";
+import {
+	scheduleAutoStartResponse,
+	shouldAutoStartResponse,
+} from "@/modules/projects/lib/auto-start";
 import { toast } from "sonner";
 
 /** Poll cadence while a response is in flight. Idle chats don't poll at all. */
@@ -246,8 +249,6 @@ export const MessagesContainer = ({ projectId }: Props) => {
 				hasInitialized: hasInitializedStreamRef.current,
 			})
 		) {
-			hasInitializedStreamRef.current = true;
-
 			const streamChatResponse = async (messageId: string) => {
 				setStreamingMessage({
 					content: "",
@@ -337,7 +338,10 @@ export const MessagesContainer = ({ projectId }: Props) => {
 				}
 			};
 
-			streamChatResponse(lastMessage.id);
+			return scheduleAutoStartResponse(() => {
+				hasInitializedStreamRef.current = true;
+				void streamChatResponse(lastMessage.id);
+			});
 		}
 	}, [
 		isLastMessageUser,

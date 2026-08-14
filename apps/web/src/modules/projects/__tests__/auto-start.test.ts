@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+	scheduleAutoStartResponse,
 	shouldAutoStartResponse,
 	type AutoStartState,
 } from "@/modules/projects/lib/auto-start";
@@ -72,5 +73,26 @@ describe("shouldAutoStartResponse", () => {
 			shouldAutoStartResponse({ ...afterStop, stopped: false }),
 			true,
 		);
+	});
+});
+
+describe("scheduleAutoStartResponse", () => {
+	it("does not start a Strict Mode probe cleaned up in the same task", async () => {
+		let starts = 0;
+		const cancel = scheduleAutoStartResponse(() => starts++);
+
+		cancel();
+		await Promise.resolve();
+
+		assert.equal(starts, 0);
+	});
+
+	it("starts once when the effect lifecycle survives cleanup", async () => {
+		let starts = 0;
+		scheduleAutoStartResponse(() => starts++);
+
+		await Promise.resolve();
+
+		assert.equal(starts, 1);
 	});
 });

@@ -36,3 +36,20 @@ export function shouldAutoStartResponse({
 		isLastMessageUser && !hasStreamingMessage && !stopped && !hasInitialized
 	);
 }
+
+/**
+ * Defers an automatic stream until the current effect lifecycle survives cleanup.
+ * React Strict Mode cleans up its development-only probe before this microtask runs,
+ * preventing that throwaway mount from opening and aborting a network request.
+ */
+export function scheduleAutoStartResponse(start: () => void): () => void {
+	let cancelled = false;
+
+	queueMicrotask(() => {
+		if (!cancelled) start();
+	});
+
+	return () => {
+		cancelled = true;
+	};
+}
