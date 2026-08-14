@@ -42,20 +42,10 @@ const VISION_TIMEOUT_MS = envMs("CHAT_VISION_TIMEOUT_MS", 90_000);
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const inputSchema = z
-	.object({
-		value: z.string().max(10000, "Prompt is too long"),
-		projectId: z.string().min(1, { message: "Project ID is required." }),
-		/**
-		 * Set when the pending user message carries images but no text. The images
-		 * themselves are read from the database — see the history load below.
-		 */
-		hasAttachments: z.boolean().optional(),
-	})
-	.refine(
-		(input) => input.value.trim().length > 0 || input.hasAttachments === true,
-		{ message: "Message cannot be empty.", path: ["value"] },
-	);
+const inputSchema = z.object({
+	projectId: z.string().trim().min(1, { message: "Project ID is required." }),
+	messageId: z.string().trim().min(1, { message: "Message ID is required." }),
+});
 
 /** Roles supported by upstream chat-completion API. */
 type ChatRole = "system" | "user" | "assistant";
@@ -129,8 +119,38 @@ interface ChatPrismaClient {
 		}) => Promise<{ id: string } | null>;
 	};
 	message: {
+		findUnique: (args: {
+			where: { id: string };
+			select: {
+				id: true;
+				projectId: true;
+				role: true;
+				type: true;
+				content: true;
+				createdAt: true;
+				attachments: {
+					select: { id: true; mimeType: true; width: true; height: true };
+					orderBy: { createdAt: "asc" };
+				};
+			};
+		}) => Promise<
+			| {
+					id: string;
+					projectId: string;
+					role: "USER" | "ASSISTANT";
+					type: "RESULT" | "ERROR" | "SUMMARY";
+					content: string;
+					createdAt: Date;
+					attachments?: HistoryAttachment[];
+			  }
+			| null
+		>;
 		findFirst: (args: {
-			where: { projectId: string; type: "SUMMARY" };
+			where: {
+				projectId: string;
+				type: "SUMMARY";
+				createdAt: { lt: Date };
+			};
 			orderBy: { createdAt: "desc" };
 			select: { content: true; createdAt: true };
 		}) => Promise<{ content: string; createdAt: Date } | null>; // The latest compaction checkpoint, if any
@@ -138,7 +158,7 @@ interface ChatPrismaClient {
 			where: {
 				projectId: string;
 				type: { not: "SUMMARY" };
-				createdAt?: { gt: Date };
+				createdAt: { gt?: Date; lt: Date };
 			};
 			orderBy: { createdAt: "desc" };
 			take: number;
@@ -369,25 +389,52 @@ export function createChatPostHandler(
 			);
 		}
 
-		const { value, projectId } = parsedInput.data;
+		const { projectId, messageId } = parsedInput.data;
 
-		// Run project lookup and checkpoint fetch in parallel — projectId from
-		// input is the same value project.id would resolve to.
-		const [project, latestCheckpoint] = await Promise.all([
+		// Temporary legacy placement: #58 moves this authorization and trigger
+		// policy behind completeChat(). Keeping it here for #57 avoids introducing a
+		// shallow interim seam that the next architecture slice would immediately remove.
+		const [project, triggerMessage] = await Promise.all([
 			dependencies.prisma.project.findUnique({
 				where: { id: projectId, userId },
 				select: { id: true },
 			}),
-			dependencies.prisma.message.findFirst({
-				where: { projectId, type: "SUMMARY" },
-				orderBy: { createdAt: "desc" },
-				select: { content: true, createdAt: true },
+			dependencies.prisma.message.findUnique({
+				where: { id: messageId },
+				select: {
+					id: true,
+					projectId: true,
+					role: true,
+					type: true,
+					content: true,
+					createdAt: true,
+					attachments: {
+						select: { id: true, mimeType: true, width: true, height: true },
+						orderBy: { createdAt: "asc" },
+					},
+				},
 			}),
 		]);
 
-		if (!project) {
+		if (
+			!project ||
+			!triggerMessage ||
+			triggerMessage.projectId !== project.id ||
+			triggerMessage.role !== "USER" ||
+			triggerMessage.type !== "RESULT"
+		) {
 			return Response.json({ error: "Project not found." }, { status: 404 });
 		}
+
+		const latestCheckpoint = await dependencies.prisma.message.findFirst({
+			where: {
+				projectId,
+				type: "SUMMARY",
+				createdAt: { lt: triggerMessage.createdAt },
+			},
+			orderBy: { createdAt: "desc" },
+			select: { content: true, createdAt: true },
+		});
 
 		// Active history starts after the latest compaction checkpoint (opencode-style):
 		// older messages stay in the database but are only visible through the summary.
@@ -395,9 +442,10 @@ export function createChatPostHandler(
 			where: {
 				projectId,
 				type: { not: "SUMMARY" },
-				...(latestCheckpoint
-					? { createdAt: { gt: latestCheckpoint.createdAt } }
-					: {}),
+				createdAt: {
+					...(latestCheckpoint ? { gt: latestCheckpoint.createdAt } : {}),
+					lt: triggerMessage.createdAt,
+				},
 			},
 			orderBy: { createdAt: "desc" },
 			take: dependencies.contextConfig.historyFetchCap,
@@ -418,13 +466,6 @@ export function createChatPostHandler(
 		// The checkpoint content evolves if compaction runs during this request.
 		let summaryContent = latestCheckpoint?.content ?? null;
 
-		// Estimate the request pieces that are always present, then let the
-		// window planner decide whether we fit or need to compact first.
-		const fixedTokens =
-			estimateMessageTokens(CHAT_PROMPT) +
-			estimateMessageTokens(value) +
-			(summaryContent ? estimateTokens(SUMMARY_PREAMBLE) : 0);
-
 		/**
 		 * Token cost of a message's images, computed from stored dimensions so the
 		 * base64 payload never reaches the chars/4 text estimator.
@@ -438,6 +479,14 @@ export function createChatPostHandler(
 				0,
 			);
 
+		// Estimate request pieces outside older history, then let the window planner
+		// decide whether the remaining messages fit or need compaction first.
+		const fixedTokens =
+			estimateMessageTokens(CHAT_PROMPT) +
+			estimateMessageTokens(triggerMessage.content) +
+			imageTokensFor(triggerMessage) +
+			(summaryContent ? estimateTokens(SUMMARY_PREAMBLE) : 0);
+
 		const plan = planContextWindow({
 			summaryContent,
 			messages: orderedHistory,
@@ -450,6 +499,14 @@ export function createChatPostHandler(
 		// newest-first up to the cap; anything older degrades to a text marker.
 		const selectedImageIds = new Set<string>();
 		const { maxImagesInContext } = dependencies.contextConfig;
+
+		for (const attachment of triggerMessage.attachments ?? []) {
+			if (selectedImageIds.size >= maxImagesInContext) {
+				break;
+			}
+
+			selectedImageIds.add(attachment.id);
+		}
 
 		for (
 			let index = plan.tail.length - 1;
@@ -546,10 +603,7 @@ export function createChatPostHandler(
 				});
 			}
 
-			const lastMessage = plan.tail[plan.tail.length - 1];
-			if (lastMessage?.role !== "USER" || lastMessage.content !== value) {
-				messages.push({ role: "user", content: value });
-			}
+			messages.push({ role: "user", content: toContent(triggerMessage) });
 
 			return messages;
 		};

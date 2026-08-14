@@ -248,10 +248,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		) {
 			hasInitializedStreamRef.current = true;
 
-			const streamChatResponse = async (
-				value: string,
-				hasAttachments: boolean,
-			) => {
+			const streamChatResponse = async (messageId: string) => {
 				setStreamingMessage({
 					content: "",
 					type: "RESULT",
@@ -262,9 +259,9 @@ export const MessagesContainer = ({ projectId }: Props) => {
 				autoStartAbortRef.current = controller;
 
 				try {
-						// Named to avoid shadowing the `stopped` state this effect guards on.
+					// Named to avoid shadowing the `stopped` state this effect guards on.
 					const { stopped: wasStopped } = await streamChatCompletion(
-						{ value, projectId, hasAttachments },
+						{ projectId, messageId },
 						{
 							onStatus: (status) =>
 								setStreamingMessage((current) => ({
@@ -340,10 +337,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 				}
 			};
 
-			streamChatResponse(
-				lastMessage.content,
-				(lastMessage.attachments?.length ?? 0) > 0,
-			);
+			streamChatResponse(lastMessage.id);
 		}
 	}, [
 		isLastMessageUser,

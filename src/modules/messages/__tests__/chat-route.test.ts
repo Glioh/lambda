@@ -39,6 +39,13 @@ interface HistoryMessage {
 	attachments?: HistoryAttachment[];
 }
 
+interface TriggerMessage extends HistoryMessage {
+	id: string;
+	projectId: string;
+	type: "RESULT" | "ERROR" | "SUMMARY";
+	createdAt: Date;
+}
+
 type ContentPart =
 	| { type: "text"; text: string }
 	| { type: "image_url"; image_url: { url: string; detail: string } };
@@ -52,16 +59,16 @@ interface CompletionBody {
 
 /**
  * Creates a request payload for the chat route test.
- * @param {string} value - The message text to submit.
+ * @param {string} messageId - Exact persisted user Message to complete.
  * @returns {Request} The chat route request.
  */
-function createRequest(value = "What is React?", signal?: AbortSignal) {
+function createRequest(messageId = "message_1", signal?: AbortSignal) {
 	return new Request("http://localhost/api/chat", {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 		},
-		body: JSON.stringify({ value, projectId: "project_1" }),
+		body: JSON.stringify({ messageId, projectId: "project_1" }),
 		signal,
 	});
 }
@@ -124,6 +131,15 @@ function createHandler({
 	contextConfig = relaxedContextConfig,
 	timeoutMs = 1000,
 	attachmentData = {},
+	triggerMessage = {
+		id: "message_1",
+		projectId: "project_1",
+		role: "USER",
+		type: "RESULT",
+		content: "What is React?",
+		createdAt: new Date("2026-01-01T00:00:10Z"),
+		attachments: [],
+	},
 }: {
 	streams?: Array<
 		(
@@ -136,6 +152,7 @@ function createHandler({
 	timeoutMs?: number;
 	/** Base64 payloads keyed by attachment id, backing prisma.attachment.findMany. */
 	attachmentData?: Record<string, string>;
+	triggerMessage?: TriggerMessage | null;
 } = {}) {
 	const messageCreate = mock.fn(async (args: { data: object }) => ({
 		id: "assistant_1",
@@ -186,6 +203,7 @@ function createHandler({
 				findUnique: mock.fn(async () => ({ id: "project_1" })),
 			},
 			message: {
+				findUnique: mock.fn(async () => triggerMessage),
 				findFirst: mock.fn(async () => checkpoint),
 				findMany: mock.fn(async () => history),
 				create: messageCreate,
@@ -235,6 +253,94 @@ function asText(content: string | ContentPart[]): string {
 }
 
 describe("POST /api/chat", () => {
+	it("loads the exact persisted user message from an identifiers-only request", async () => {
+		const { POST, completionCreate } = createHandler({
+			triggerMessage: {
+				id: "message_exact",
+				projectId: "project_1",
+				role: "USER",
+				type: "RESULT",
+				content: "Persisted prompt wins",
+				createdAt: new Date("2026-01-01T00:00:10Z"),
+				attachments: [],
+			},
+		});
+		const request = new Request("http://localhost/api/chat", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				projectId: "project_1",
+				messageId: "message_exact",
+			}),
+		});
+
+		const response = await POST(request);
+		await response.text();
+
+		assert.equal(response.status, 200);
+		assert.equal(
+			completionBodyAt(completionCreate, 0).messages.at(-1)?.content,
+			"Persisted prompt wins",
+		);
+	});
+
+	it("returns not found when the persisted Message does not exist", async () => {
+		const { POST } = createHandler({ triggerMessage: null });
+
+		assert.equal((await POST(createRequest("missing"))).status, 404);
+	});
+
+	it("returns not found when the Message belongs to another Project Workspace", async () => {
+		const { POST } = createHandler({
+			triggerMessage: {
+				id: "message_other_project",
+				projectId: "project_2",
+				role: "USER",
+				type: "RESULT",
+				content: "Private prompt",
+				createdAt: new Date("2026-01-01T00:00:10Z"),
+				attachments: [],
+			},
+		});
+
+		assert.equal(
+			(await POST(createRequest("message_other_project"))).status,
+			404,
+		);
+	});
+
+	it("returns not found when the Message was not written by the user", async () => {
+		const { POST } = createHandler({
+			triggerMessage: {
+				id: "assistant_1",
+				projectId: "project_1",
+				role: "ASSISTANT",
+				type: "RESULT",
+				content: "Assistant answer",
+				createdAt: new Date("2026-01-01T00:00:10Z"),
+				attachments: [],
+			},
+		});
+
+		assert.equal((await POST(createRequest("assistant_1"))).status, 404);
+	});
+
+	it("returns not found when the Message is not a result", async () => {
+		const { POST } = createHandler({
+			triggerMessage: {
+				id: "error_1",
+				projectId: "project_1",
+				role: "USER",
+				type: "ERROR",
+				content: "Failed prompt",
+				createdAt: new Date("2026-01-01T00:00:10Z"),
+				attachments: [],
+			},
+		});
+
+		assert.equal((await POST(createRequest("error_1"))).status, 404);
+	});
+
 	it("streams tokens and persists the assistant message", async () => {
 		const { POST, completionCreate, messageCreate } = createHandler();
 
@@ -502,19 +608,21 @@ describe("POST /api/chat", () => {
 
 	it("sends an attached image as an image_url content part", async () => {
 		const { POST, completionCreate, attachmentFindMany } = createHandler({
-			history: [
-				{
-					role: "USER",
-					content: "what is in this image?",
-					attachments: [
-						{ id: "att_1", mimeType: "image/png", width: 1024, height: 1024 },
-					],
-				},
-			],
+			triggerMessage: {
+				id: "message_image",
+				projectId: "project_1",
+				role: "USER",
+				type: "RESULT",
+				content: "what is in this image?",
+				createdAt: new Date("2026-01-01T00:00:10Z"),
+				attachments: [
+					{ id: "att_1", mimeType: "image/png", width: 1024, height: 1024 },
+				],
+			},
 			attachmentData: { att_1: "QUJD" },
 		});
 
-		await (await POST(createRequest("what is in this image?"))).text();
+		await (await POST(createRequest("message_image"))).text();
 
 		const messages = completionBodyAt(completionCreate, 0).messages;
 		const imageMessage = messages.find((message) =>
@@ -677,38 +785,35 @@ describe("POST /api/chat", () => {
 		);
 	});
 
-	it("rejects a request with neither text nor attachments", async () => {
+	it("rejects a request without a Message ID", async () => {
 		const { POST } = createHandler();
+		const request = new Request("http://localhost/api/chat", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ projectId: "project_1" }),
+		});
 
-		const response = await POST(createRequest("   "));
+		const response = await POST(request);
 
 		assert.equal(response.status, 400);
 	});
 
-	it("accepts an image-only message when hasAttachments is set", async () => {
+	it("accepts an exact persisted image-only Message", async () => {
 		const { POST } = createHandler({
-			history: [
-				{
-					role: "USER",
-					content: "",
-					attachments: [
-						{ id: "att_1", mimeType: "image/png", width: 512, height: 512 },
-					],
-				},
-			],
+			triggerMessage: {
+				id: "message_image",
+				projectId: "project_1",
+				role: "USER",
+				type: "RESULT",
+				content: "",
+				createdAt: new Date("2026-01-01T00:00:10Z"),
+				attachments: [
+					{ id: "att_1", mimeType: "image/png", width: 512, height: 512 },
+				],
+			},
 			attachmentData: { att_1: "QUJD" },
 		});
 
-		const request = new Request("http://localhost/api/chat", {
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({
-				value: "",
-				projectId: "project_1",
-				hasAttachments: true,
-			}),
-		});
-
-		assert.equal((await POST(request)).status, 200);
+		assert.equal((await POST(createRequest("message_image"))).status, 200);
 	});
 });
