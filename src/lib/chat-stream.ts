@@ -1,5 +1,6 @@
 "use client";
 
+/** Callbacks receiving incremental chat stream events. */
 export interface ChatStreamHandlers {
 	/** Called for `event: status` frames (e.g. "thinking", "compacting"). */
 	onStatus?: (status: string) => void;
@@ -9,25 +10,23 @@ export interface ChatStreamHandlers {
 	onError?: (message: string) => void;
 }
 
+/** Controls cancellation and event handling for chat stream consumption. */
 export interface ChatStreamOptions {
 	/** Aborting this stops generation; the server persists whatever streamed. */
 	signal?: AbortSignal;
 }
 
+/** Indicates whether the caller aborted the chat stream. */
 export interface ChatStreamResult {
 	/** True when the caller aborted rather than the stream finishing on its own. */
 	stopped: boolean;
 }
 
+/** Request payload accepted by chat streaming endpoint. */
 export interface ChatStreamInput {
-	value: string;
 	projectId: string;
-	/**
-	 * Signals that the just-saved user message carries images, which is what
-	 * lets an image-only message pass the route's "not empty" check. The images
-	 * themselves are read from the database, never re-sent here.
-	 */
-	hasAttachments?: boolean;
+	/** Exact persisted user Message whose content and attachments are loaded server-side. */
+	messageId: string;
 }
 
 /**
@@ -35,7 +34,7 @@ export interface ChatStreamInput {
  * Resolves once the stream ends (a `[DONE]` frame or reader completion).
  * Throws when the request cannot be started.
  *
- * @param {ChatStreamInput} input - The prompt and target chat.
+ * @param {ChatStreamInput} input - Persisted Message and target Chat identifiers.
  * @param {ChatStreamHandlers} handlers - Per-event callbacks.
  * @param {ChatStreamOptions} [options] - Abort control for stop-generation.
  * @returns {Promise<ChatStreamResult>} Whether the caller stopped the stream.

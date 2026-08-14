@@ -99,10 +99,10 @@ export const MessageForm = ({
 
 	/**
 	 * Starts the chat stream and forwards incoming tokens to the parent.
-	 * @param {string} value - The submitted user prompt.
+	 * @param {string} messageId - Exact persisted user Message to complete.
 	 * @returns {Promise<void>} A promise that resolves when streaming ends.
 	 */
-	const streamChatResponse = async (value: string, hasAttachments: boolean) => {
+	const streamChatResponse = async (messageId: string) => {
 		onChatStreamStart?.();
 
 		const controller = new AbortController();
@@ -110,7 +110,7 @@ export const MessageForm = ({
 
 		try {
 			const { stopped } = await streamChatCompletion(
-				{ value, projectId, hasAttachments },
+				{ projectId, messageId },
 				{
 					onStatus: (status) => onChatStreamStatus?.(status),
 					onToken: (token) => onChatStreamToken?.(token),
@@ -122,7 +122,7 @@ export const MessageForm = ({
 				{ signal: controller.signal },
 			);
 
-			// Report the stop BEFORE refetching. The refetch re-renders the thread
+			// Report the stop BEFORE refetching. The refetch re-renders the chat
 			// still ending on the user's message, which the container reads as
 			// "unanswered" — it has to know a stop happened first, or it re-streams
 			// the prompt the user just interrupted.
@@ -165,7 +165,7 @@ export const MessageForm = ({
 					: {}),
 			},
 			{
-				onSuccess: async (_message, variables) => {
+				onSuccess: async (message) => {
 					form.reset();
 					clearAttachments();
 					// Fire-and-forget for usage — not on critical path
@@ -182,10 +182,7 @@ export const MessageForm = ({
 					queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
 
 					try {
-						await streamChatResponse(
-							variables.value,
-							(variables.attachments?.length ?? 0) > 0,
-						);
+						await streamChatResponse(message.id);
 					} catch (error) {
 						const errorMessage =
 							error instanceof Error

@@ -9,6 +9,7 @@ import {
 } from "../constants";
 import { prepareImage, type PreparedImage } from "../lib/prepare-image";
 
+/** Attachment selection state and actions exposed to message composers. */
 export interface UseAttachments {
 	attachments: PreparedImage[];
 	isPreparing: boolean;

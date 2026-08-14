@@ -19,8 +19,8 @@ export interface ContextConfig {
 	/**
 	 * How many of the newest images in the verbatim tail are actually sent to the
 	 * model. Older ones degrade to a text marker — images are the most expensive
-	 * thing in the window, and a long thread of screenshots would otherwise
-	 * crowd out the conversation itself.
+	 * thing in the window, and a long chat containing screenshots would otherwise
+	 * crowd out the chat itself.
 	 */
 	maxImagesInContext: number;
 }

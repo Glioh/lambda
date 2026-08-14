@@ -7,6 +7,7 @@ import { UserButton } from "@clerk/nextjs";
 interface Props {
 	showName?: boolean;
 }
+/** Renders current user's account control or sign-in action. */
 export const UserControl = ({ showName }: Props) => {
 	const currentTheme = useCurrentTheme();
 

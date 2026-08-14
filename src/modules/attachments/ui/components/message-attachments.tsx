@@ -1,5 +1,6 @@
 import Image from "next/image";
 
+/** Persisted image metadata needed to render message attachment. */
 export interface MessageAttachment {
 	id: string;
 	mimeType: string;

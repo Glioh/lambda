@@ -9,6 +9,7 @@ const MAX_TITLE_TOKENS = 24;
 const MAX_TITLE_WORDS = 8;
 const MAX_TITLE_CHARS = 60;
 
+/** Opening message data used to derive generated chat title. */
 export interface TitleSourceMessage {
 	role: "USER" | "ASSISTANT";
 	content: string;

@@ -26,6 +26,7 @@ const attachmentInputSchema = z.object({
 	height: z.int().positive(),
 });
 
+/** tRPC router for authenticated project and chat-management operations. */
 export const projectsRouter = createTRPCRouter({
 	getOne: protectedProcedure
 		.input(

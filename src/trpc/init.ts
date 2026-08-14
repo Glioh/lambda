@@ -14,6 +14,7 @@ export const createTRPCContext = cache(async () => {
 	return { auth: resolved };
 });
 
+/** Request-scoped data available to RPC procedures. */
 export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
 
 const t = initTRPC.context<Context>().create({
@@ -63,8 +64,13 @@ const hasUsageCredits = t.middleware(async ({ next }) => {
 	}
 });
 
+/** Creates application RPC router. */
 export const createTRPCRouter = t.router;
+/** Creates server-side caller for RPC router. */
 export const createCallerFactory = t.createCallerFactory;
+/** Public RPC procedure without authentication requirement. */
 export const baseProcedure = t.procedure;
+/** RPC procedure requiring authenticated user. */
 export const protectedProcedure = t.procedure.use(isAuthed);
+/** Authenticated RPC procedure requiring available usage credit. */
 export const usageProtectedProcedure = protectedProcedure.use(hasUsageCredits);

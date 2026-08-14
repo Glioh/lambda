@@ -8,11 +8,11 @@ import {
 const at = (minute: number) => new Date(2026, 7, 2, 12, minute, 0);
 
 /**
- * A thread compacted twice. Each SUMMARY is backdated to the newest message it
+ * A chat compacted twice. Each SUMMARY is backdated to the newest message it
  * folded, which is how the chat route places checkpoints — so `sum1` covers
  * everything through t=2 and `sum2` covers everything through t=5.
  */
-const thread = [
+const chatHistory = [
 	{ id: "u1", createdAt: at(1), type: "RESULT" as const, role: "USER" },
 	{ id: "a1", createdAt: at(2), type: "RESULT" as const, role: "ASSISTANT" },
 	{ id: "sum1", createdAt: at(2), type: "SUMMARY" as const, role: "ASSISTANT" },
@@ -24,7 +24,7 @@ const thread = [
 ];
 
 const survivorsOf = (boundary: Date, edge: "from" | "after") =>
-	survivingMessages(thread, rollbackScope(boundary, edge)).map((m) => m.id);
+	survivingMessages(chatHistory, rollbackScope(boundary, edge)).map((m) => m.id);
 
 describe("rollbackScope: retrying an answer", () => {
 	it("discards the answer itself and everything after it", () => {
@@ -34,7 +34,7 @@ describe("rollbackScope: retrying an answer", () => {
 	it("discards a checkpoint dated after the retried answer", () => {
 		// The regression this rule exists for. `sum2` folded messages through t=5,
 		// which this rollback deletes — keeping it would replay a summary of a
-		// conversation that no longer exists. Sparing SUMMARY rows unconditionally
+		// chat that no longer exists. Sparing SUMMARY rows unconditionally
 		// (correct only when retrying the newest answer) got this wrong.
 		assert.ok(!survivorsOf(at(4), "from").includes("sum2"));
 	});
@@ -62,8 +62,11 @@ describe("rollbackScope: retrying an answer", () => {
 		]);
 	});
 
-	it("leaves the thread ending on the prompt behind the retried answer", () => {
-		const surviving = survivingMessages(thread, rollbackScope(at(6), "from"));
+	it("leaves the chat ending on the prompt behind the retried answer", () => {
+		const surviving = survivingMessages(
+			chatHistory,
+			rollbackScope(at(6), "from"),
+		);
 		const last = surviving.filter((m) => m.type !== "SUMMARY").at(-1);
 		assert.equal(last?.id, "u3");
 		assert.equal(last?.role, "USER");
@@ -84,8 +87,11 @@ describe("rollbackScope: re-running or editing a prompt", () => {
 		assert.ok(survivorsOf(at(5), "after").includes("sum2"));
 	});
 
-	it("leaves the thread ending on the prompt itself", () => {
-		const surviving = survivingMessages(thread, rollbackScope(at(5), "after"));
+	it("leaves the chat ending on the prompt itself", () => {
+		const surviving = survivingMessages(
+			chatHistory,
+			rollbackScope(at(5), "after"),
+		);
 		const last = surviving.filter((m) => m.type !== "SUMMARY").at(-1);
 		assert.equal(last?.id, "u3");
 	});

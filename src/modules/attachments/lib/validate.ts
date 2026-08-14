@@ -7,11 +7,13 @@ import {
 	type UnvalidatedAttachment,
 } from "../constants";
 
+/** Attachment proven safe to persist, including decoded byte size. */
 export interface ValidatedAttachment extends UnvalidatedAttachment {
 	/** Decoded size, stored for quota accounting and shown in the UI. */
 	byteSize: number;
 }
 
+/** Reports rejected attachment input at API validation boundary. */
 export class AttachmentValidationError extends Error {}
 
 /**

@@ -31,6 +31,7 @@ const ShimmerMessages = () => {
 	);
 };
 
+/** Displays animated placeholder while assistant response is pending. */
 export const MessageLoading = () => {
 	return (
 		<div className="flex flex-col group px-2 pb-4">

@@ -5,7 +5,7 @@ import {
 	type AutoStartState,
 } from "@/modules/projects/lib/auto-start";
 
-/** The home-page handoff: an unanswered thread on a fresh mount. */
+/** The home-page handoff: an unanswered chat on a fresh mount. */
 const handoff: AutoStartState = {
 	isLastMessageUser: true,
 	hasStreamingMessage: false,
@@ -19,7 +19,7 @@ describe("shouldAutoStartResponse", () => {
 	});
 
 	it("does NOT restart after the user stops generation", () => {
-		// The regression this function exists for. A stopped turn leaves the thread
+		// The regression this function exists for. A stopped turn leaves the chat
 		// ending on a USER message with no preview on screen — identical to the
 		// handoff except for `stopped`. Without that flag the interrupted prompt
 		// was immediately re-run and answered again.
@@ -57,7 +57,7 @@ describe("shouldAutoStartResponse", () => {
 		);
 	});
 
-	it("does not start when the thread already ends on an answer", () => {
+	it("does not start when the chat already ends on an answer", () => {
 		assert.equal(
 			shouldAutoStartResponse({ ...handoff, isLastMessageUser: false }),
 			false,

@@ -5,6 +5,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 /** How close to the bottom still counts as "following along". */
 const NEAR_BOTTOM_PX = 80;
 
+/** Controls and reports follow-to-bottom behavior for a scroll container. */
 export interface StickToBottom<T extends HTMLElement> {
 	/** Attach to the scroll container. */
 	scrollRef: React.RefObject<T | null>;

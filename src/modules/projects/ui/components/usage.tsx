@@ -10,6 +10,7 @@ interface Props {
 	msBeforeNext: number;
 }
 
+/** Displays remaining generation credits and reset timing. */
 export const Usage = ({ points, msBeforeNext }: Props) => {
 	const { has } = useAuth();
 	const hasProAccess = has?.({ plan: "pro" });

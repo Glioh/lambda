@@ -44,7 +44,7 @@ export const DeleteChatDialog = ({
 	const remove = useMutation(
 		trpc.projects.remove.mutationOptions({
 			onSuccess: ({ id }) => {
-				// Drop the thread's cache outright — nothing can render it now, and
+				// Drop the chat's cache outright — nothing can render it now, and
 				// leaving it would resurrect the chat in the list on a refocus refetch.
 				queryClient.removeQueries({
 					queryKey: trpc.messages.getMany.queryKey({ projectId: id }),

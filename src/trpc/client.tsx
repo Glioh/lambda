@@ -10,6 +10,7 @@ import { makeQueryClient } from './query-client';
 import type { AppRouter } from './routers/_app';
 export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
 let browserQueryClient: QueryClient;
+/** Returns request-local server client or browser singleton query client. */
 function getQueryClient() {
   if (typeof window === 'undefined') {
     // Server: always make a new query client
@@ -22,6 +23,7 @@ function getQueryClient() {
   if (!browserQueryClient) browserQueryClient = makeQueryClient();
   return browserQueryClient;
 }
+/** Uses a relative RPC path in browsers and NEXT_PUBLIC_APP_URL on the server. */
 function getUrl() {
   const base = (() => {
     if (typeof window !== 'undefined') return '';
@@ -31,6 +33,7 @@ function getUrl() {
   return `${base}/api/trpc`;
   // This structure is important recall where we put [trpc] earlier
 }
+/** Provides browser RPC and query clients to React descendants. */
 export function TRPCReactProvider(
   props: Readonly<{
     children: React.ReactNode;
