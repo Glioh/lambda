@@ -2,6 +2,8 @@ import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from "fastify";
+import { clerkPlugin } from "@clerk/fastify";
+import { resolveClerkPrincipal } from "./auth/clerk-auth.js";
 
 const healthResponseSchema = {
   type: "object",
@@ -31,6 +33,17 @@ export function buildApp(
     },
     async () => ({ status: "ok" as const }),
   );
+
+  // Temporary ARCH-03 compatibility endpoint.
+  // Remove once real protected Fastify transports use AuthPrincipal.
+  app.register(async (protectedApp) => {
+    protectedApp.register(clerkPlugin);
+    
+    protectedApp.get("/api/auth/probe", async (request, reply) => {
+      const principal = resolveClerkPrincipal(request);
+      return principal ?? reply.code(401).send({ error: "Unauthorized" });
+    });
+  });
 
   return app;
 }

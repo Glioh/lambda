@@ -106,6 +106,7 @@ Responsibilities:
 - Integrations own communication with external vendors/protocols.
 - Prisma must remain backend-only.
 - Authentication libraries must remain behind a Lambda-owned auth boundary.
+- Local development uses real authenticated accounts through the configured auth provider. Lambda does not maintain a fake-user or no-auth development bypass.
 
 ## Architecture principles
 

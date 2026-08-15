@@ -17,15 +17,21 @@ describe("API application", () => {
 
   it("returns schema-defined health response", async () => {
     app = buildApp({ logger: false });
+
     assert.equal(app.server.listening, false);
 
-    const response = await app.inject({ method: "GET", url: "/api/health" });
+    const response = await app.inject({
+      method: "GET",
+      url: "/api/health",
+    });
 
     assert.equal(response.statusCode, 200);
     assert.deepEqual(response.json(), { status: "ok" });
-    assert.match(response.headers["content-type"] ?? "", /application\/json/);
+    assert.match(
+      response.headers["content-type"] ?? "",
+      /application\/json/,
+    );
   });
-
 });
 
 describe("API server configuration", () => {
@@ -38,8 +44,14 @@ describe("API server configuration", () => {
 
   it("accepts API-specific environment overrides", () => {
     assert.deepEqual(
-      getServerConfig({ API_HOST: "127.0.0.1", API_PORT: "4500" }),
-      { host: "127.0.0.1", port: 4500 },
+      getServerConfig({
+        API_HOST: "127.0.0.1",
+        API_PORT: "4500",
+      }),
+      {
+        host: "127.0.0.1",
+        port: 4500,
+      },
     );
   });
 
