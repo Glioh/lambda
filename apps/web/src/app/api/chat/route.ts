@@ -1,10 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { DEV_FAKE_USER_ID, DEV_NO_AUTH } from "@/lib/dev-auth";
-import type {
-	ChatCompletionEvent,
-	ChatCompletionResult,
-	CompleteChatInput,
-} from "@/modules/chats/server/completion";
+import type { ChatCompletionEvent, ChatCompletionResult, CompleteChatInput, } from "@/modules/chats/server/completion";
 import z from "zod";
 
 export const runtime = "nodejs";

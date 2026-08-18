@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { AttachmentValidationError, validateAttachments } from "@/modules/attachments/lib/validate";
-import {
-	MAX_ATTACHMENT_BYTES,
-	MAX_ATTACHMENTS_PER_MESSAGE,
-	MAX_TOTAL_ATTACHMENT_BYTES,
-} from "@/modules/attachments/constants";
+import { MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_TOTAL_ATTACHMENT_BYTES, } from "@/modules/attachments/constants";
 
 /** A real 1x1 PNG. */
 const PNG_1X1 =

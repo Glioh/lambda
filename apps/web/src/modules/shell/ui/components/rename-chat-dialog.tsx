@@ -4,14 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useTRPC } from "@/trpc/client";
 
@@ -29,23 +22,14 @@ interface Props {
  * @param {Props} props - The dialog props.
  * @returns {JSX.Element} The rendered rename dialog.
  */
-export const RenameChatDialog = ({
-	open,
-	onOpenChange,
-	chatId,
-	currentName,
-}: Props) => {
+export const RenameChatDialog = ({ open, onOpenChange, chatId, currentName }: Props) => {
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md">
 				{/* The form lives in a child so its draft state is seeded on mount and
 				    thrown away on close — Radix unmounts the content when closed, so
 				    reopening always starts from the current name with no reset effect. */}
-				<RenameForm
-					chatId={chatId}
-					currentName={currentName}
-					onDone={() => onOpenChange(false)}
-				/>
+				<RenameForm chatId={chatId} currentName={currentName} onDone={() => onOpenChange(false)} />
 			</DialogContent>
 		</Dialog>
 	);
@@ -86,12 +70,11 @@ const RenameForm = ({ chatId, currentName, onDone }: FormProps) => {
 	);
 
 	const trimmed = name.trim();
-	const canSubmit =
-		trimmed.length > 0 && trimmed !== currentName && !rename.isPending;
+	const canSubmit = trimmed.length > 0 && trimmed !== currentName && !rename.isPending;
 
 	return (
 		<form
-			onSubmit={(event) => {
+			onSubmit={event => {
 				event.preventDefault();
 				if (canSubmit) {
 					rename.mutate({ id: chatId, name: trimmed });
@@ -100,16 +83,14 @@ const RenameForm = ({ chatId, currentName, onDone }: FormProps) => {
 		>
 			<DialogHeader>
 				<DialogTitle>Rename chat</DialogTitle>
-				<DialogDescription>
-					Give this chat a name you&apos;ll recognize later.
-				</DialogDescription>
+				<DialogDescription>Give this chat a name you&apos;ll recognize later.</DialogDescription>
 			</DialogHeader>
 			<div className="py-4">
 				<Input
 					autoFocus
 					value={name}
 					maxLength={MAX_NAME_LENGTH}
-					onChange={(event) => setName(event.target.value)}
+					onChange={event => setName(event.target.value)}
 					placeholder="Chat name"
 				/>
 			</div>

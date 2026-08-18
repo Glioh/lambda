@@ -6,20 +6,12 @@ import { useAuth } from "@clerk/nextjs";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { ChevronDown, CrownIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UserControl } from "@/components/user-control";
 import { DeleteChatDialog } from "@/modules/shell/ui/components/delete-chat-dialog";
 import { RenameChatDialog } from "@/modules/shell/ui/components/rename-chat-dialog";
-import { ApiError } from "@/api/client";
-import { api } from "@/api/browser";
-import { queryKeys } from "@/api/query-keys";
 import { projectQueries } from "@/api/queries";
 
 interface Props {

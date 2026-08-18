@@ -4,18 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MoreHorizontalIcon, PencilIcon, Trash2Icon } from "lucide-react";
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-	SidebarMenuAction,
-	SidebarMenuButton,
-	SidebarMenuItem,
-	useSidebar,
-} from "@/components/ui/sidebar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, } from "@/components/ui/dropdown-menu";
+import { SidebarMenuAction, SidebarMenuButton, SidebarMenuItem, useSidebar, } from "@/components/ui/sidebar";
 import type { ChatListEntry } from "@/modules/shell/lib/group-chats";
 import { DeleteChatDialog } from "./delete-chat-dialog";
 import { RenameChatDialog } from "./rename-chat-dialog";

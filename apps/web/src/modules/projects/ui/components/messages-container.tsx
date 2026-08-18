@@ -11,10 +11,7 @@ import { ScrollToBottomButton } from "./scroll-to-bottom-button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageLoading } from "./message-loading";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
-import {
-	scheduleAutoStartResponse,
-	shouldAutoStartResponse,
-} from "@/modules/projects/lib/auto-start";
+import { scheduleAutoStartResponse, shouldAutoStartResponse, } from "@/modules/projects/lib/auto-start";
 import { toast } from "sonner";
 
 /** Poll cadence while a response is in flight. Idle chats don't poll at all. */

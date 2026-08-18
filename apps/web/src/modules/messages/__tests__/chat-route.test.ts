@@ -1,11 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createChatPostHandler, type ChatRouteDependencies } from "@/app/api/chat/route";
-import type {
-	ChatCompletionEvent,
-	ChatCompletionResult,
-	CompleteChatInput,
-} from "@/modules/chats/server/completion";
+import type { ChatCompletionEvent, ChatCompletionResult, CompleteChatInput, } from "@/modules/chats/server/completion";
 
 function createRequest(body = { projectId: "project_1", messageId: "message_1" }) {
 	return new Request("http://localhost/api/chat", {

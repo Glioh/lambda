@@ -1,13 +1,6 @@
 "use client";
 
-import {
-	ACCEPTED_IMAGE_TYPES,
-	MAX_IMAGE_EDGE,
-	MAX_SOURCE_BYTES,
-	REENCODE_QUALITY,
-	type AcceptedImageType,
-	type AttachmentInput,
-} from "../constants";
+import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_EDGE, MAX_SOURCE_BYTES, REENCODE_QUALITY, type AcceptedImageType, type AttachmentInput, } from "../constants";
 
 /**
  * Narrows a browser-reported mime type to one the server will accept.

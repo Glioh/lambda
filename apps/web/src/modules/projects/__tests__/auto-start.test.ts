@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-	scheduleAutoStartResponse,
-	shouldAutoStartResponse,
-	type AutoStartState,
-} from "@/modules/projects/lib/auto-start";
+import { scheduleAutoStartResponse, shouldAutoStartResponse, type AutoStartState, } from "@/modules/projects/lib/auto-start";
 
 /** The home-page handoff: an unanswered chat on a fresh mount. */
 const handoff: AutoStartState = {

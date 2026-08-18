@@ -8,17 +8,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-	Sidebar,
-	SidebarContent,
-	SidebarFooter,
-	SidebarHeader,
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
-	SidebarRail,
-	useSidebar,
-} from "@/components/ui/sidebar";
+import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, useSidebar, } from "@/components/ui/sidebar";
 import { ChatList } from "./chat-list";
 import { ChatListSkeleton } from "./chat-list-skeleton";
 import { SidebarUserMenu } from "./sidebar-user-menu";

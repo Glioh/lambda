@@ -2,14 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { ContextConfig } from "../constants";
 import { compactionTriggerTokens, validateContextConfig } from "../constants";
-import {
-	FALLBACK_IMAGE_TOKENS,
-	LOW_DETAIL_IMAGE_TOKENS,
-	estimateImageTokens,
-	estimateMessageTokens,
-	estimateMessagesTokens,
-	estimateTokens,
-} from "../tokens";
+import { FALLBACK_IMAGE_TOKENS, LOW_DETAIL_IMAGE_TOKENS, estimateImageTokens, estimateMessageTokens, estimateMessagesTokens, estimateTokens, } from "../tokens";
 import { planContextWindow } from "../window";
 import { SUMMARY_PREAMBLE, buildCompactionMessages, buildSummaryContextBlock } from "../compaction";
 

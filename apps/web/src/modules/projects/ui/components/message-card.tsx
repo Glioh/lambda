@@ -7,10 +7,7 @@ import Image from "next/image";
 import { Markdown } from "@/components/markdown";
 import { MessageActions } from "./message-actions";
 import { MessageEditForm } from "./message-edit-form";
-import {
-	MessageAttachments,
-	type MessageAttachment,
-} from "@/modules/attachments/ui/components/message-attachments";
+import { MessageAttachments, type MessageAttachment, } from "@/modules/attachments/ui/components/message-attachments";
 
 type MessageRole = Message["role"];
 type MessageType = Message["type"];

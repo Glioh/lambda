@@ -1,14 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { DEFAULT_CONTEXT_CONFIG, type ContextConfig } from "@/modules/context";
-import {
-	createCompleteChat,
-	type ChatCompletionEvent,
-	type ChatCompletionModel,
-	type ChatHistoryMessage,
-	type ChatStore,
-	type PersistedTriggerMessage,
-} from "../complete-chat";
+import { createCompleteChat, type ChatCompletionEvent, type ChatCompletionModel, type ChatHistoryMessage, type ChatStore, type PersistedTriggerMessage, } from "../complete-chat";
 
 const tinyContextConfig: ContextConfig = {
 	...DEFAULT_CONTEXT_CONFIG,

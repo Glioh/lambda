@@ -11,5 +11,6 @@
 	"jsxSingleQuote": false,
 	"quoteProps": "as-needed",
 	"proseWrap": "preserve",
-	"endOfLine": "lf"
+	"endOfLine": "lf",
+	"plugins": ["prettier-plugin-one-line-imports"]
 }

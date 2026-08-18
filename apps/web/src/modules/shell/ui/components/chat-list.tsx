@@ -2,12 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import {
-	SidebarGroup,
-	SidebarGroupContent,
-	SidebarGroupLabel,
-	SidebarMenu,
-} from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, } from "@/components/ui/sidebar";
 import { projectQueries } from "@/api/queries";
 import { groupChatsByRecency } from "@/modules/shell/lib/group-chats";
 import { ChatListItem } from "./chat-list-item";

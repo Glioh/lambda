@@ -2,11 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-	MAX_ATTACHMENTS_PER_MESSAGE,
-	MAX_TOTAL_ATTACHMENT_BYTES,
-	type AttachmentInput,
-} from "../constants";
+import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_TOTAL_ATTACHMENT_BYTES, type AttachmentInput, } from "../constants";
 import { prepareImage, type PreparedImage } from "../lib/prepare-image";
 
 /** Attachment selection state and actions exposed to message composers. */

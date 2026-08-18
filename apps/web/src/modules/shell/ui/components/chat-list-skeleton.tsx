@@ -1,10 +1,4 @@
-import {
-	SidebarGroup,
-	SidebarGroupContent,
-	SidebarMenu,
-	SidebarMenuItem,
-	SidebarMenuSkeleton,
-} from "@/components/ui/sidebar";
+import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuItem, SidebarMenuSkeleton, } from "@/components/ui/sidebar";
 
 const PLACEHOLDER_ROWS = 6;
 
