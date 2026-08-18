@@ -35,12 +35,7 @@ export function sanitizeTitle(raw: string): string | null {
 		return null;
 	}
 
-	return cleaned
-		.split(" ")
-		.slice(0, MAX_TITLE_WORDS)
-		.join(" ")
-		.slice(0, MAX_TITLE_CHARS)
-		.trim();
+	return cleaned.split(" ").slice(0, MAX_TITLE_WORDS).join(" ").slice(0, MAX_TITLE_CHARS).trim();
 }
 
 /**
@@ -50,7 +45,7 @@ export function sanitizeTitle(raw: string): string | null {
  */
 function buildSource(messages: TitleSourceMessage[]): string {
 	return messages
-		.map((message) => {
+		.map(message => {
 			const speaker = message.role === "ASSISTANT" ? "Assistant" : "User";
 			const body = message.content.trim() || (message.hasImage ? "" : "(empty)");
 			const image = message.hasImage ? " [shared an image]" : "";
@@ -89,34 +84,29 @@ export async function generateChatTitle(
 	const timeout = AbortSignal.timeout(TITLE_TIMEOUT_MS);
 
 	try {
-		const response = await fetchImpl(
-			"https://api.openai.com/v1/chat/completions",
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
-				},
-				body: JSON.stringify({
-					model: TITLE_MODEL,
-					messages: [
-						{ role: "system", content: TITLE_PROMPT },
-						{ role: "user", content: source },
-					],
-					max_tokens: MAX_TITLE_TOKENS,
-					temperature: 0.3,
-				}),
-				signal: timeout,
+		const response = await fetchImpl("https://api.openai.com/v1/chat/completions", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${process.env.OPENAI_API_KEY ?? ""}`,
 			},
-		);
+			body: JSON.stringify({
+				model: TITLE_MODEL,
+				messages: [
+					{ role: "system", content: TITLE_PROMPT },
+					{ role: "user", content: source },
+				],
+				max_tokens: MAX_TITLE_TOKENS,
+				temperature: 0.3,
+			}),
+			signal: timeout,
+		});
 
 		// Every failure below returns null so the slug stands, but logs first —
 		// otherwise a persistently broken titler is indistinguishable from chats
 		// that simply haven't been titled yet.
 		if (!response.ok) {
-			console.warn(
-				`Chat title generation failed: ${response.status} ${response.statusText}`,
-			);
+			console.warn(`Chat title generation failed: ${response.status} ${response.statusText}`);
 			return null;
 		}
 

@@ -43,9 +43,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
 	}
 
 	if (file.size > MAX_SOURCE_BYTES) {
-		throw new Error(
-			`${file.name} is over ${Math.floor(MAX_SOURCE_BYTES / 1024 / 1024)}MB.`,
-		);
+		throw new Error(`${file.name} is over ${Math.floor(MAX_SOURCE_BYTES / 1024 / 1024)}MB.`);
 	}
 
 	const bitmap = await createImageBitmap(file).catch(() => {
@@ -53,10 +51,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
 	});
 
 	try {
-		const scale = Math.min(
-			1,
-			MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height),
-		);
+		const scale = Math.min(1, MAX_IMAGE_EDGE / Math.max(bitmap.width, bitmap.height));
 		const width = Math.max(1, Math.round(bitmap.width * scale));
 		const height = Math.max(1, Math.round(bitmap.height * scale));
 
@@ -74,7 +69,7 @@ export async function prepareImage(file: File): Promise<PreparedImage> {
 
 		context.drawImage(bitmap, 0, 0, width, height);
 
-		const blob = await new Promise<Blob | null>((resolve) =>
+		const blob = await new Promise<Blob | null>(resolve =>
 			canvas.toBlob(resolve, "image/webp", REENCODE_QUALITY),
 		);
 

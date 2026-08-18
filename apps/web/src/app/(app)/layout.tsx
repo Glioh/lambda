@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import { resolveUserId } from "@/lib/dev-auth";
+import { auth } from "@clerk/nextjs/server";
 import { AppShell } from "@/modules/shell/ui/components/app-shell";
 import { MarketingChrome } from "@/modules/shell/ui/components/marketing-chrome";
-import { getQueryClient, trpc } from "@/trpc/server";
+import { makeQueryClient } from "@/lib/query-client";
+import { queryKeys, type ProjectListItem } from "@/api/client";
+import { serverApiRequest } from "@/api/server-client";
 
 /** The cookie SidebarProvider persists its open/closed state to. */
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -20,20 +22,21 @@ interface Props {
  * @returns {Promise<JSX.Element>} The rendered shell for the current viewer.
  */
 const Layout = async ({ children }: Props) => {
-	// resolveUserId, not auth(), so the DEV_NO_AUTH bypass reaches the app shell
-	// instead of silently landing local dev on the marketing page.
-	const userId = await resolveUserId();
+	const { userId } = await auth();
 
 	if (!userId) {
 		return <MarketingChrome>{children}</MarketingChrome>;
 	}
 
-	const [cookieStore, queryClient] = [await cookies(), getQueryClient()];
+	const [cookieStore, queryClient] = [await cookies(), makeQueryClient()];
 	// SidebarProvider writes this cookie but nothing read it until now; reading
 	// it server-side is what stops the sidebar flashing open then collapsing.
 	const defaultOpen = cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false";
 
-	await queryClient.prefetchQuery(trpc.projects.getMany.queryOptions());
+	await queryClient.prefetchQuery({
+		queryKey: queryKeys.projects,
+		queryFn: () => serverApiRequest<ProjectListItem[]>("/api/projects"),
+	});
 
 	return (
 		<HydrationBoundary state={dehydrate(queryClient)}>

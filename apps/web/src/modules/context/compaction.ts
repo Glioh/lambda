@@ -32,16 +32,14 @@ export interface CompactionSourceMessage {
  * @param {CompactionSourceAttachment[]} [attachments] - The message's images.
  * @returns {string} The marker lines, or an empty string when there are none.
  */
-function describeAttachments(
-	attachments?: CompactionSourceAttachment[],
-): string {
+function describeAttachments(attachments?: CompactionSourceAttachment[]): string {
 	if (!attachments?.length) {
 		return "";
 	}
 
 	return `\n${attachments
 		.map(
-			(attachment) =>
+			attachment =>
 				`[image attached: ${attachment.mimeType} ${attachment.width}×${attachment.height}]`,
 		)
 		.join("\n")}`;
@@ -59,7 +57,7 @@ export interface CompactionChatMessage {
 function serializeHistory(messages: CompactionSourceMessage[]): string {
 	return messages
 		.map(
-			(message) =>
+			message =>
 				`${message.role === "ASSISTANT" ? "Assistant" : "User"}: ${message.content}` +
 				describeAttachments(message.attachments),
 		)
@@ -78,14 +76,10 @@ export function buildCompactionMessages(
 	const sections: string[] = [];
 
 	if (previousSummary) {
-		sections.push(
-			`<previous_summary>\n${previousSummary}\n</previous_summary>`,
-		);
+		sections.push(`<previous_summary>\n${previousSummary}\n</previous_summary>`);
 	}
 
-	sections.push(
-		`<chat_to_summarize>\n${serializeHistory(headMessages)}\n</chat_to_summarize>`,
-	);
+	sections.push(`<chat_to_summarize>\n${serializeHistory(headMessages)}\n</chat_to_summarize>`);
 
 	return [
 		{ role: "system", content: COMPACTION_PROMPT },

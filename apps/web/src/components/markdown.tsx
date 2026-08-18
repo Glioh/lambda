@@ -49,9 +49,7 @@ export function Markdown({ content, className }: MarkdownProps) {
 				rehypePlugins={[rehypeKatex]}
 				components={{
 					// Open links in a new tab; they come from model output.
-					a: ({ ...props }) => (
-						<a {...props} target="_blank" rel="noopener noreferrer" />
-					),
+					a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
 				}}
 			>
 				{normalizeMathDelimiters(content)}

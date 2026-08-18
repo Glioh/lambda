@@ -16,7 +16,7 @@ export interface ChatGroup {
 /**
  * Buckets chats into recency groups for the sidebar.
  *
- * Input is expected newest-first (as `projects.getMany` returns it); group order
+ * Input is expected newest-first (as API returns it); group order
  * follows first appearance so the result stays newest-first without a second
  * sort. Empty buckets are omitted entirely rather than rendered as empty headings.
  *
@@ -24,10 +24,7 @@ export interface ChatGroup {
  * @param {number} now - Reference timestamp, injectable so this is testable.
  * @returns {ChatGroup[]} Non-empty groups in newest-first order.
  */
-export function groupChatsByRecency(
-	chats: ChatListEntry[],
-	now: number,
-): ChatGroup[] {
+export function groupChatsByRecency(chats: ChatListEntry[], now: number): ChatGroup[] {
 	const groups: ChatGroup[] = [];
 	const byLabel = new Map<string, ChatGroup>();
 

@@ -19,9 +19,7 @@ export const MarketingHome = () => {
 						className="hidden md:block"
 					/>
 				</div>
-				<h1 className="text-2xl md:text-5xl font-bold text-center">
-					Chat with Lambda
-				</h1>
+				<h1 className="text-2xl md:text-5xl font-bold text-center">Chat with Lambda</h1>
 				<p className="text-lg md:text-xl text-muted-foreground text-center">
 					Ask questions about UI, React, Next.js, and coding
 				</p>

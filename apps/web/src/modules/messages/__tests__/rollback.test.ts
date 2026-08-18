@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-	rollbackScope,
-	survivingMessages,
-} from "@/modules/messages/lib/rollback";
+import { rollbackScope, survivingMessages } from "@/modules/messages/lib/rollback";
 
 const at = (minute: number) => new Date(2026, 7, 2, 12, minute, 0);
 
@@ -24,7 +21,7 @@ const chatHistory = [
 ];
 
 const survivorsOf = (boundary: Date, edge: "from" | "after") =>
-	survivingMessages(chatHistory, rollbackScope(boundary, edge)).map((m) => m.id);
+	survivingMessages(chatHistory, rollbackScope(boundary, edge)).map(m => m.id);
 
 describe("rollbackScope: retrying an answer", () => {
 	it("discards the answer itself and everything after it", () => {
@@ -51,23 +48,12 @@ describe("rollbackScope: retrying an answer", () => {
 
 	it("can retry an error message", () => {
 		// ERROR rows are otherwise dead ends you can only escape by retyping.
-		assert.deepEqual(survivorsOf(at(6), "from"), [
-			"u1",
-			"a1",
-			"sum1",
-			"u2",
-			"a2",
-			"u3",
-			"sum2",
-		]);
+		assert.deepEqual(survivorsOf(at(6), "from"), ["u1", "a1", "sum1", "u2", "a2", "u3", "sum2"]);
 	});
 
 	it("leaves the chat ending on the prompt behind the retried answer", () => {
-		const surviving = survivingMessages(
-			chatHistory,
-			rollbackScope(at(6), "from"),
-		);
-		const last = surviving.filter((m) => m.type !== "SUMMARY").at(-1);
+		const surviving = survivingMessages(chatHistory, rollbackScope(at(6), "from"));
+		const last = surviving.filter(m => m.type !== "SUMMARY").at(-1);
 		assert.equal(last?.id, "u3");
 		assert.equal(last?.role, "USER");
 	});
@@ -88,11 +74,8 @@ describe("rollbackScope: re-running or editing a prompt", () => {
 	});
 
 	it("leaves the chat ending on the prompt itself", () => {
-		const surviving = survivingMessages(
-			chatHistory,
-			rollbackScope(at(5), "after"),
-		);
-		const last = surviving.filter((m) => m.type !== "SUMMARY").at(-1);
+		const surviving = survivingMessages(chatHistory, rollbackScope(at(5), "after"));
+		const last = surviving.filter(m => m.type !== "SUMMARY").at(-1);
 		assert.equal(last?.id, "u3");
 	});
 });

@@ -8,8 +8,11 @@ import { Form, FormField } from "@/components/ui/form";
 import TextareaAutosize from "react-textarea-autosize";
 import { ArrowUpIcon, Loader2Icon, SquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "@/api/client";
+import { api } from "@/api/browser";
+import { queryKeys } from "@/api/query-keys";
+import { usageQueries } from "@/api/queries";
 import { toast } from "sonner";
 import { Usage } from "./usage";
 import { useRouter } from "next/navigation";
@@ -59,7 +62,6 @@ export const MessageForm = ({
 	onChatStreamStopped,
 	onStopRequested,
 }: Props) => {
-	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -79,7 +81,7 @@ export const MessageForm = ({
 		onStopRequested?.();
 	}, [onStopRequested]);
 
-	const { data: usage } = useQuery(trpc.usage.status.queryOptions());
+	const { data: usage } = useQuery(usageQueries.status());
 
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
@@ -95,7 +97,13 @@ export const MessageForm = ({
 	// the component memoizable instead of opting it out of the compiler.
 	const watchedValue = useWatch({ control: form.control, name: "value" });
 
-	const createMessage = useMutation(trpc.messages.create.mutationOptions());
+	const createMessage = useMutation({
+		mutationFn: (input: {
+			value: string;
+			projectId: string;
+			attachments?: ReturnType<typeof attachmentsToInput>;
+		}) => api.messages.create(input.projectId, input),
+	});
 
 	/**
 	 * Starts the chat stream and forwards incoming tokens to the parent.
@@ -112,12 +120,10 @@ export const MessageForm = ({
 			const { stopped } = await streamChatCompletion(
 				{ projectId, messageId },
 				{
-					onStatus: (status) => onChatStreamStatus?.(status),
-					onToken: (token) => onChatStreamToken?.(token),
-					onError: (message) =>
-						onChatStreamError?.(
-							message || "Something went wrong. Please try again.",
-						),
+					onStatus: status => onChatStreamStatus?.(status),
+					onToken: token => onChatStreamToken?.(token),
+					onError: message =>
+						onChatStreamError?.(message || "Something went wrong. Please try again."),
 				},
 				{ signal: controller.signal },
 			);
@@ -128,15 +134,15 @@ export const MessageForm = ({
 			// the prompt the user just interrupted.
 			if (stopped) {
 				onChatStreamStopped?.();
-				await queryClient.invalidateQueries(
-					trpc.messages.getMany.queryOptions({ projectId }),
-				);
+				await queryClient.invalidateQueries({
+					queryKey: queryKeys.messages(projectId),
+				});
 				return;
 			}
 
-			await queryClient.invalidateQueries(
-				trpc.messages.getMany.queryOptions({ projectId }),
-			);
+			await queryClient.invalidateQueries({
+				queryKey: queryKeys.messages(projectId),
+			});
 
 			onChatStreamEnd?.();
 		} finally {
@@ -160,43 +166,39 @@ export const MessageForm = ({
 			{
 				value: values.value,
 				projectId,
-				...(pendingAttachments.length > 0
-					? { attachments: pendingAttachments }
-					: {}),
+				...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
 			},
 			{
-				onSuccess: async (message) => {
+				onSuccess: async message => {
 					form.reset();
 					clearAttachments();
 					// Fire-and-forget for usage — not on critical path
-					queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+					queryClient.invalidateQueries({ queryKey: queryKeys.usage });
 
 					// Don't block stream on message list refresh
 					// The poll interval will pick up the new message
-					queryClient.invalidateQueries(
-						trpc.messages.getMany.queryOptions({ projectId }),
-					);
+					queryClient.invalidateQueries({
+						queryKey: queryKeys.messages(projectId),
+					});
 
 					// Activity bumps Project.updatedAt server-side, so refresh the
 					// sidebar to float this chat back to the top of the list.
-					queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
+					queryClient.invalidateQueries({ queryKey: queryKeys.projects });
 
 					try {
 						await streamChatResponse(message.id);
 					} catch (error) {
 						const errorMessage =
-							error instanceof Error
-								? error.message
-								: "Something went wrong. Please try again.";
+							error instanceof Error ? error.message : "Something went wrong. Please try again.";
 
 						onChatStreamError?.(errorMessage);
 						toast.error(errorMessage);
 					}
 				},
-				onError: (error) => {
+				onError: error => {
 					toast.error(error.message);
 
-					if (error.data?.code === "TOO_MANY_REQUESTS") {
+					if (error instanceof ApiError && error.code === "TOO_MANY_REQUESTS") {
 						router.push("/pricing");
 					}
 				},
@@ -212,30 +214,22 @@ export const MessageForm = ({
 	const hasText = (watchedValue ?? "").trim().length > 0;
 	// Text or images is enough — an uncaptioned screenshot is a real message.
 	const isButtonDisabled =
-		isPending ||
-		isPreparing ||
-		!form.formState.isValid ||
-		(!hasText && attachments.length === 0);
+		isPending || isPreparing || !form.formState.isValid || (!hasText && attachments.length === 0);
 
 	return (
 		<Form {...form}>
-			{showUsage && (
-				<Usage
-					points={usage.remainingPoints}
-					msBeforeNext={usage.msBeforeNext}
-				/>
-			)}
+			{showUsage && <Usage points={usage.remainingPoints} msBeforeNext={usage.msBeforeNext} />}
 			<form
 				// Built inside the handler, not during render: handleSubmit(onSubmit)
 				// at render time would invoke a closure that reaches the abort ref.
-				onSubmit={(event) => form.handleSubmit(onSubmit)(event)}
+				onSubmit={event => form.handleSubmit(onSubmit)(event)}
 				className={cn(
 					"relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all",
 					isFocused && "shadow-xs",
 					showUsage && "rounded-t-none",
 				)}
-				onDragOver={(event) => event.preventDefault()}
-				onDrop={(event) => {
+				onDragOver={event => event.preventDefault()}
+				onDrop={event => {
 					// Ignore drops once the message is being sent — the files would
 					// never make it into the request that's already in flight.
 					if (isPending || isPreparing) {
@@ -248,11 +242,7 @@ export const MessageForm = ({
 					}
 				}}
 			>
-				<AttachmentStrip
-					attachments={attachments}
-					onRemove={removeAt}
-					disabled={isPending}
-				/>
+				<AttachmentStrip attachments={attachments} onRemove={removeAt} disabled={isPending} />
 				<FormField
 					control={form.control}
 					name="value"
@@ -266,7 +256,7 @@ export const MessageForm = ({
 							maxRows={8}
 							className="pt-4 resize-none border-none w-full outline-none bg-transparent"
 							placeholder="Type your message here..."
-							onKeyDown={(e) => {
+							onKeyDown={e => {
 								if (e.key === "Escape" && isStreaming) {
 									e.preventDefault();
 									stopStreaming();
@@ -291,11 +281,7 @@ export const MessageForm = ({
 				/>
 				<div className="flex gap-x-2 items-center justify-between pt-2">
 					<div className="flex items-center gap-1">
-						<AttachmentButton
-							onFiles={addFiles}
-							disabled={isPending}
-							isPreparing={isPreparing}
-						/>
+						<AttachmentButton onFiles={addFiles} disabled={isPending} isPreparing={isPreparing} />
 						<div className="text-[10px] text-muted-foreground font-mono">
 							<kbd
 								className="pointer-events-none inline-flex h-5 select-none items-center gap-1
@@ -324,11 +310,7 @@ export const MessageForm = ({
 								isButtonDisabled && "bg-muted-foreground border",
 							)}
 						>
-							{isPending ? (
-								<Loader2Icon className="size-4 animate-spin" />
-							) : (
-								<ArrowUpIcon />
-							)}
+							{isPending ? <Loader2Icon className="size-4 animate-spin" /> : <ArrowUpIcon />}
 						</Button>
 					)}
 				</div>

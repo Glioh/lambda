@@ -1,4 +1,4 @@
-import { resolveUserId } from "@/lib/dev-auth";
+import { auth } from "@clerk/nextjs/server";
 import { NewChatView } from "@/modules/home/ui/views/new-chat-view";
 import { MarketingHome } from "@/modules/marketing/ui/views/marketing-home";
 
@@ -8,7 +8,7 @@ import { MarketingHome } from "@/modules/marketing/ui/views/marketing-home";
  * @returns {Promise<JSX.Element>} The rendered home screen.
  */
 const Page = async () => {
-	const userId = await resolveUserId();
+	const { userId } = await auth();
 
 	return userId ? <NewChatView /> : <MarketingHome />;
 };

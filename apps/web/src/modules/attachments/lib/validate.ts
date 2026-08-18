@@ -26,16 +26,13 @@ export class AttachmentValidationError extends Error {}
  * `nosniff` header at read time are three parts of one defense — don't drop any.
  */
 const MAGIC_BYTES: Record<string, (bytes: Buffer) => boolean> = {
-	"image/png": (bytes) =>
-		bytes
-			.subarray(0, 8)
-			.equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-	"image/jpeg": (bytes) =>
-		bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
-	"image/webp": (bytes) =>
+	"image/png": bytes =>
+		bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+	"image/jpeg": bytes => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
+	"image/webp": bytes =>
 		bytes.subarray(0, 4).toString("latin1") === "RIFF" &&
 		bytes.subarray(8, 12).toString("latin1") === "WEBP",
-	"image/gif": (bytes) => bytes.subarray(0, 4).toString("latin1") === "GIF8",
+	"image/gif": bytes => bytes.subarray(0, 4).toString("latin1") === "GIF8",
 };
 
 /** Smallest payload that could carry a checkable signature. */
@@ -48,9 +45,7 @@ const MIN_SIGNATURE_BYTES = 12;
  * @returns {ValidatedAttachment[]} The attachments, with decoded sizes attached.
  * @throws {AttachmentValidationError} When anything fails the checks above.
  */
-export function validateAttachments(
-	inputs: UnvalidatedAttachment[],
-): ValidatedAttachment[] {
+export function validateAttachments(inputs: UnvalidatedAttachment[]): ValidatedAttachment[] {
 	if (inputs.length > MAX_ATTACHMENTS_PER_MESSAGE) {
 		throw new AttachmentValidationError(
 			`You can attach at most ${MAX_ATTACHMENTS_PER_MESSAGE} images per message.`,
@@ -61,12 +56,8 @@ export function validateAttachments(
 	let totalBytes = 0;
 
 	for (const input of inputs) {
-		if (
-			!(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(input.mimeType)
-		) {
-			throw new AttachmentValidationError(
-				`Unsupported image type: ${input.mimeType}.`,
-			);
+		if (!(ACCEPTED_IMAGE_TYPES as readonly string[]).includes(input.mimeType)) {
+			throw new AttachmentValidationError(`Unsupported image type: ${input.mimeType}.`);
 		}
 
 		if (

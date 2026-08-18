@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-	createChatPostHandler,
-	type ChatRouteDependencies,
-} from "@/app/api/chat/route";
+import { createChatPostHandler, type ChatRouteDependencies } from "@/app/api/chat/route";
 import type {
 	ChatCompletionEvent,
 	ChatCompletionResult,
@@ -18,23 +15,24 @@ function createRequest(body = { projectId: "project_1", messageId: "message_1" }
 	});
 }
 
-function createHandler(options: {
-	authUserId?: string | null;
-	result?:
-		| { kind: "not-found" }
-		| {
-				kind: "started";
-				events: AsyncIterable<ChatCompletionEvent>;
-		  };
-} = {}) {
+function createHandler(
+	options: {
+		authUserId?: string | null;
+		result?:
+			| { kind: "not-found" }
+			| {
+					kind: "started";
+					events: AsyncIterable<ChatCompletionEvent>;
+			  };
+	} = {},
+) {
 	const calls: Array<{ userId: string; projectId: string; messageId: string }> = [];
-	const authUserId =
-		options.authUserId === undefined ? "user_1" : options.authUserId;
+	const authUserId = options.authUserId === undefined ? "user_1" : options.authUserId;
 	const POST = createChatPostHandler({
-		auth: (async () => ({ userId: authUserId })) as unknown as ChatRouteDependencies["auth"],
-		completeChat: async (
-			input: CompleteChatInput,
-		): Promise<ChatCompletionResult> => {
+		auth: (async () => ({
+			userId: authUserId,
+		})) as unknown as ChatRouteDependencies["auth"],
+		completeChat: async (input: CompleteChatInput): Promise<ChatCompletionResult> => {
 			calls.push({
 				userId: input.userId,
 				projectId: input.projectId,
@@ -62,9 +60,7 @@ describe("POST /api/chat", () => {
 		await response.text();
 
 		assert.equal(response.status, 200);
-		assert.deepEqual(calls, [
-			{ userId: "user_1", projectId: "project_1", messageId: "message_1" },
-		]);
+		assert.deepEqual(calls, [{ userId: "user_1", projectId: "project_1", messageId: "message_1" }]);
 	});
 
 	it("rejects unauthenticated requests", async () => {
@@ -82,10 +78,7 @@ describe("POST /api/chat", () => {
 		assert.equal(response.status, 400);
 		const body = await response.json();
 		assert.equal(body.error, "Invalid request body.");
-		assert.match(
-			JSON.stringify(body.details),
-			/Project ID is required|Message ID is required/,
-		);
+		assert.match(JSON.stringify(body.details), /Project ID is required|Message ID is required/);
 	});
 
 	it("rejects malformed JSON with a 400 response", async () => {
@@ -146,9 +139,7 @@ describe("POST /api/chat", () => {
 							next: async () =>
 								reads++ === 0
 									? { value: { kind: "thinking" } as const, done: false }
-									: new Promise<IteratorResult<ChatCompletionEvent>>(
-										() => undefined,
-									),
+									: new Promise<IteratorResult<ChatCompletionEvent>>(() => undefined),
 							return: async () => {
 								released = true;
 								return { value: undefined, done: true };

@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it, mock } from "node:test";
-import {
-	generateChatTitle,
-	sanitizeTitle,
-} from "@/modules/projects/server/title";
+import { generateChatTitle, sanitizeTitle } from "@/modules/projects/server/title";
 
 /**
  * Builds a fetch stand-in returning a chat-completions payload.
@@ -65,11 +62,8 @@ describe("generateChatTitle", () => {
 
 		assert.equal(title, "Debugging a useEffect loop");
 
-		const call = (fetchImpl as unknown as ReturnType<typeof mock.fn>).mock
-			.calls[0];
-		const body = JSON.parse(
-			(call.arguments[1] as { body: string }).body,
-		) as {
+		const call = (fetchImpl as unknown as ReturnType<typeof mock.fn>).mock.calls[0];
+		const body = JSON.parse((call.arguments[1] as { body: string }).body) as {
 			model: string;
 			max_tokens: number;
 			messages: Array<{ role: string; content: string }>;
@@ -83,13 +77,9 @@ describe("generateChatTitle", () => {
 	it("describes an image-only opening message to the model", async () => {
 		const fetchImpl = okFetch("Reading a stack trace screenshot");
 
-		await generateChatTitle(
-			[{ role: "USER", content: "", hasImage: true }],
-			fetchImpl,
-		);
+		await generateChatTitle([{ role: "USER", content: "", hasImage: true }], fetchImpl);
 
-		const call = (fetchImpl as unknown as ReturnType<typeof mock.fn>).mock
-			.calls[0];
+		const call = (fetchImpl as unknown as ReturnType<typeof mock.fn>).mock.calls[0];
 		const body = JSON.parse((call.arguments[1] as { body: string }).body) as {
 			messages: Array<{ content: string }>;
 		};
@@ -98,14 +88,11 @@ describe("generateChatTitle", () => {
 	});
 
 	it("returns null on a non-200 response", async () => {
-		const fetchImpl = mock.fn(async () =>
-			new Response("nope", { status: 429 }),
+		const fetchImpl = mock.fn(
+			async () => new Response("nope", { status: 429 }),
 		) as unknown as typeof fetch;
 
-		assert.equal(
-			await generateChatTitle([{ role: "USER", content: "hi" }], fetchImpl),
-			null,
-		);
+		assert.equal(await generateChatTitle([{ role: "USER", content: "hi" }], fetchImpl), null);
 	});
 
 	it("returns null when the request throws", async () => {
@@ -113,10 +100,7 @@ describe("generateChatTitle", () => {
 			throw new Error("network down");
 		}) as unknown as typeof fetch;
 
-		assert.equal(
-			await generateChatTitle([{ role: "USER", content: "hi" }], fetchImpl),
-			null,
-		);
+		assert.equal(await generateChatTitle([{ role: "USER", content: "hi" }], fetchImpl), null);
 	});
 
 	it("returns null when the payload has no content", async () => {
@@ -124,10 +108,7 @@ describe("generateChatTitle", () => {
 			Response.json({ choices: [] }),
 		) as unknown as typeof fetch;
 
-		assert.equal(
-			await generateChatTitle([{ role: "USER", content: "hi" }], fetchImpl),
-			null,
-		);
+		assert.equal(await generateChatTitle([{ role: "USER", content: "hi" }], fetchImpl), null);
 	});
 
 	it("returns null without calling the model when there is nothing to title", async () => {
@@ -136,9 +117,6 @@ describe("generateChatTitle", () => {
 		) as unknown as typeof fetch;
 
 		assert.equal(await generateChatTitle([], fetchImpl), null);
-		assert.equal(
-			(fetchImpl as unknown as ReturnType<typeof mock.fn>).mock.callCount(),
-			0,
-		);
+		assert.equal((fetchImpl as unknown as ReturnType<typeof mock.fn>).mock.callCount(), 0);
 	});
 });

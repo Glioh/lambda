@@ -33,9 +33,7 @@ export const MessageEditForm = ({
 
 	const trimmed = value.trim();
 	const canSubmit =
-		!isPending &&
-		(trimmed.length > 0 || !!allowEmpty) &&
-		trimmed !== initialValue.trim();
+		!isPending && (trimmed.length > 0 || !!allowEmpty) && trimmed !== initialValue.trim();
 
 	const submit = () => {
 		if (canSubmit) {
@@ -50,11 +48,11 @@ export const MessageEditForm = ({
 				aria-label="Edit message"
 				value={value}
 				disabled={isPending}
-				onChange={(event) => setValue(event.target.value)}
+				onChange={event => setValue(event.target.value)}
 				minRows={2}
 				maxRows={12}
 				className="w-full resize-none border-none bg-transparent outline-none"
-				onKeyDown={(event) => {
+				onKeyDown={event => {
 					if (event.key === "Escape") {
 						event.preventDefault();
 						onCancel();
@@ -68,13 +66,7 @@ export const MessageEditForm = ({
 				}}
 			/>
 			<div className="flex items-center justify-end gap-2 pt-2">
-				<Button
-					type="button"
-					size="sm"
-					variant="ghost"
-					onClick={onCancel}
-					disabled={isPending}
-				>
+				<Button type="button" size="sm" variant="ghost" onClick={onCancel} disabled={isPending}>
 					Cancel
 				</Button>
 				<Button type="button" size="sm" onClick={submit} disabled={!canSubmit}>

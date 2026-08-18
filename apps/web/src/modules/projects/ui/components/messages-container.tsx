@@ -1,17 +1,14 @@
 import { streamChatCompletion } from "@/lib/chat-stream";
-import { useTRPC } from "@/trpc/client";
-import {
-	useSuspenseQuery,
-	useQueryClient,
-	useMutation,
-	useQuery,
-} from "@tanstack/react-query";
+import { ApiError, type Message } from "@/api/client";
+import { api } from "@/api/browser";
+import { queryKeys } from "@/api/query-keys";
+import { messageQueries, projectQueries } from "@/api/queries";
+import { useSuspenseQuery, useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { MessageCard } from "./message-card";
 import { MessageForm } from "./message-form";
 import { ScrollToBottomButton } from "./scroll-to-bottom-button";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { MessageType } from "@prisma/client";
 import { MessageLoading } from "./message-loading";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import {
@@ -33,14 +30,13 @@ interface Props {
  * @returns {JSX.Element} The rendered messages container.
  */
 export const MessagesContainer = ({ projectId }: Props) => {
-	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const router = useRouter();
 	const hasInitializedStreamRef = useRef<boolean>(false);
 	const autoStartAbortRef = useRef<AbortController | null>(null);
 	const [streamingMessage, setStreamingMessage] = useState<{
 		content: string;
-		type: MessageType;
+		type: Message["type"];
 		isStreaming: boolean;
 		status?: string;
 	} | null>(null);
@@ -54,29 +50,19 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	/** Id of the user message currently open in the inline editor, if any. */
 	const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
-	const { data: messages } = useSuspenseQuery(
-		trpc.messages.getMany.queryOptions(
-			{
-				projectId: projectId,
-			},
-			{
-				// Only poll while a response is actually in flight. Idle polling
-				// re-serialized the whole transcript every 1.5s forever, which grows
-				// with the chat and buys nothing once the answer has landed.
-				refetchInterval: streamingMessage ? STREAMING_POLL_MS : false,
-				staleTime: 5_000,
-			},
-		),
-	);
+	const { data: messages } = useSuspenseQuery({
+		...messageQueries.list(projectId),
+		refetchInterval: streamingMessage ? STREAMING_POLL_MS : false,
+		staleTime: 5_000,
+	});
 
 	const lastMessage = messages[messages.length - 1];
 	const isLastMessageUser = lastMessage?.role === "USER";
 
-	const { scrollRef, handleScroll, isAtBottom, scrollToBottom } =
-		useStickToBottom<HTMLDivElement>([
-			messages.length,
-			streamingMessage?.content,
-		]);
+	const { scrollRef, handleScroll, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([
+		messages.length,
+		streamingMessage?.content,
+	]);
 
 	/**
 	 * Marks the stream as stopped. The partial answer is frozen in place (rather
@@ -86,10 +72,8 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	 */
 	const handleStopped = useCallback(() => {
 		setStopped(true);
-		setStreamingMessage((current) =>
-			current?.content
-				? { ...current, isStreaming: false, status: undefined }
-				: null,
+		setStreamingMessage(current =>
+			current?.content ? { ...current, isStreaming: false, status: undefined } : null,
 		);
 	}, []);
 
@@ -134,13 +118,11 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	);
 
 	// Cache hit — ChatHeader already fetched this project for the title bar.
-	const { data: project } = useQuery(
-		trpc.projects.getOne.queryOptions({ id: projectId }),
-	);
+	const { data: project } = useQuery(projectQueries.detail(projectId));
 
-	const generateTitle = useMutation(
-		trpc.projects.generateTitle.mutationOptions(),
-	);
+	const generateTitle = useMutation({
+		mutationFn: () => api.projects.generateTitle(projectId),
+	});
 
 	/**
 	 * Names the chat once it has an answer worth naming. The server is the real
@@ -152,31 +134,32 @@ export const MessagesContainer = ({ projectId }: Props) => {
 			return;
 		}
 
-		generateTitle.mutate(
-			{ id: projectId },
-			{
-				onSuccess: (result) => {
-					if (!result) {
-						return;
-					}
+		generateTitle.mutate(undefined, {
+			onSuccess: result => {
+				if (!result) {
+					return;
+				}
 
-					// The sidebar lives above this view in the layout and shares the
-					// same QueryClient, so invalidating is all it takes to retitle it.
-					queryClient.invalidateQueries(
-						trpc.projects.getOne.queryOptions({ id: projectId }),
-					);
-					queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-				},
-				// Titling is cosmetic: a failure must never surface as an error toast.
-				onError: () => undefined,
+				// The sidebar lives above this view in the layout and shares the
+				// same QueryClient, so invalidating is all it takes to retitle it.
+				queryClient.invalidateQueries({
+					queryKey: queryKeys.project(projectId),
+				});
+				queryClient.invalidateQueries({ queryKey: queryKeys.projects });
 			},
-		);
-	}, [project?.titleGeneratedAt, generateTitle, projectId, queryClient, trpc]);
+			// Titling is cosmetic: a failure must never surface as an error toast.
+			onError: () => undefined,
+		});
+	}, [project?.titleGeneratedAt, generateTitle, projectId, queryClient]);
 
-	const retryFrom = useMutation(trpc.messages.retryFrom.mutationOptions());
-	const editAndResend = useMutation(
-		trpc.messages.editAndResend.mutationOptions(),
-	);
+	const retryFrom = useMutation({
+		mutationFn: ({ messageId }: { messageId: string }) =>
+			api.messages.retryFrom(projectId, messageId),
+	});
+	const editAndResend = useMutation({
+		mutationFn: ({ messageId, value }: { messageId: string; value: string }) =>
+			api.messages.editAndResend(projectId, messageId, { value }),
+	});
 
 	/**
 	 * Shared tail of every rollback (retry and edit alike).
@@ -192,18 +175,18 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		setEditingMessageId(null);
 		hasInitializedStreamRef.current = false;
 
-		await queryClient.invalidateQueries(
-			trpc.messages.getMany.queryOptions({ projectId }),
-		);
-		queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-	}, [projectId, queryClient, trpc]);
+		await queryClient.invalidateQueries({
+			queryKey: queryKeys.messages(projectId),
+		});
+		queryClient.invalidateQueries({ queryKey: queryKeys.usage });
+	}, [projectId, queryClient]);
 
 	/** Surfaces a rollback failure, routing to pricing when out of credits. */
 	const onRollbackError = useCallback(
-		(error: { message: string; data?: { code?: string } | null }) => {
+		(error: { message: string; code?: string }) => {
 			toast.error(error.message);
 
-			if (error.data?.code === "TOO_MANY_REQUESTS") {
+			if (error instanceof ApiError && error.code === "TOO_MANY_REQUESTS") {
 				router.push("/pricing");
 			}
 		},
@@ -213,28 +196,24 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	/** Rolls the chat back to an answer and re-runs the prompt behind it. */
 	const handleRetry = useCallback(
 		(messageId: string) => {
-			retryFrom.mutate(
-				{ projectId, messageId },
-				{ onSuccess: afterRollback, onError: onRollbackError },
-			);
+			retryFrom.mutate({ messageId }, { onSuccess: afterRollback, onError: onRollbackError });
 		},
-		[retryFrom, projectId, afterRollback, onRollbackError],
+		[retryFrom, afterRollback, onRollbackError],
 	);
 
 	// One in-flight rollback at a time: both mutations truncate the chat, so
 	// letting a second start mid-flight would race two different rollback points.
-	const isRollbackBusy =
-		!!streamingMessage || retryFrom.isPending || editAndResend.isPending;
+	const isRollbackBusy = !!streamingMessage || retryFrom.isPending || editAndResend.isPending;
 
 	/** Rewrites a user turn, discards everything after it, and re-runs it. */
 	const handleSubmitEdit = useCallback(
 		(messageId: string, value: string) => {
 			editAndResend.mutate(
-				{ projectId, messageId, value },
+				{ messageId, value },
 				{ onSuccess: afterRollback, onError: onRollbackError },
 			);
 		},
-		[editAndResend, projectId, afterRollback, onRollbackError],
+		[editAndResend, afterRollback, onRollbackError],
 	);
 
 	// Start streaming response if last message is from user and we aren't already streaming a response
@@ -264,20 +243,20 @@ export const MessagesContainer = ({ projectId }: Props) => {
 					const { stopped: wasStopped } = await streamChatCompletion(
 						{ projectId, messageId },
 						{
-							onStatus: (status) =>
-								setStreamingMessage((current) => ({
+							onStatus: status =>
+								setStreamingMessage(current => ({
 									content: current?.content ?? "",
 									type: current?.type ?? "RESULT",
 									isStreaming: true,
 									status,
 								})),
-							onToken: (token) =>
-								setStreamingMessage((current) => ({
+							onToken: token =>
+								setStreamingMessage(current => ({
 									content: `${current?.content ?? ""}${token}`,
 									type: current?.type ?? "RESULT",
 									isStreaming: true,
 								})),
-							onError: (message) =>
+							onError: message =>
 								setStreamingMessage({
 									content: message,
 									type: "ERROR",
@@ -301,24 +280,22 @@ export const MessagesContainer = ({ projectId }: Props) => {
 						// Same ordering as MessageForm: latch the stop before the refetch
 						// re-renders a chat that still ends on the user's message.
 						handleStopped();
-						await queryClient.invalidateQueries(
-							trpc.messages.getMany.queryOptions({ projectId }),
-						);
+						await queryClient.invalidateQueries({
+							queryKey: queryKeys.messages(projectId),
+						});
 						maybeGenerateTitle();
 						return;
 					}
 
-					await queryClient.invalidateQueries(
-						trpc.messages.getMany.queryOptions({ projectId }),
-					);
+					await queryClient.invalidateQueries({
+						queryKey: queryKeys.messages(projectId),
+					});
 
 					setStreamingMessage(null);
 					maybeGenerateTitle();
 				} catch (error) {
 					const errorMessage =
-						error instanceof Error
-							? error.message
-							: "Something went wrong. Please try again.";
+						error instanceof Error ? error.message : "Something went wrong. Please try again.";
 
 					setStreamingMessage({
 						content: errorMessage,
@@ -350,7 +327,6 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		handleStopped,
 		maybeGenerateTitle,
 		projectId,
-		trpc,
 		queryClient,
 		lastMessage,
 	]);
@@ -370,7 +346,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 							key={message.id}
 							content={message.content}
 							role={message.role}
-							createdAt={message.createdAt}
+							createdAt={new Date(message.createdAt)}
 							type={message.type}
 							isLast={index === messages.length - 1 && !streamingMessage}
 							// Retry is offered on every message, yours included — rolling
@@ -380,13 +356,9 @@ export const MessagesContainer = ({ projectId }: Props) => {
 							attachments={message.attachments}
 							isEditing={editingMessageId === message.id}
 							isEditPending={editAndResend.isPending}
-							onStartEdit={
-								isRollbackBusy
-									? undefined
-									: () => setEditingMessageId(message.id)
-							}
+							onStartEdit={isRollbackBusy ? undefined : () => setEditingMessageId(message.id)}
 							onCancelEdit={() => setEditingMessageId(null)}
-							onSubmitEdit={(value) => handleSubmitEdit(message.id, value)}
+							onSubmitEdit={value => handleSubmitEdit(message.id, value)}
 						/>
 					))}
 					{streamingMessage && (
@@ -397,15 +369,11 @@ export const MessagesContainer = ({ projectId }: Props) => {
 							type={streamingMessage.type}
 							isStreaming={streamingMessage.isStreaming}
 							statusLabel={
-								streamingMessage.status === "compacting"
-									? "Compacting chat…"
-									: undefined
+								streamingMessage.status === "compacting" ? "Compacting chat…" : undefined
 							}
 						/>
 					)}
-					{isLastMessageUser && !streamingMessage && !stopped && (
-						<MessageLoading />
-					)}
+					{isLastMessageUser && !streamingMessage && !stopped && <MessageLoading />}
 				</div>
 			</div>
 
@@ -432,16 +400,16 @@ export const MessagesContainer = ({ projectId }: Props) => {
 								isStreaming: true,
 							});
 						}}
-						onChatStreamStatus={(status) =>
-							setStreamingMessage((current) => ({
+						onChatStreamStatus={status =>
+							setStreamingMessage(current => ({
 								content: current?.content ?? "",
 								type: current?.type ?? "RESULT",
 								isStreaming: true,
 								status,
 							}))
 						}
-						onChatStreamToken={(token) =>
-							setStreamingMessage((current) => ({
+						onChatStreamToken={token =>
+							setStreamingMessage(current => ({
 								content: `${current?.content ?? ""}${token}`,
 								type: current?.type ?? "RESULT",
 								isStreaming: true,
@@ -451,7 +419,7 @@ export const MessagesContainer = ({ projectId }: Props) => {
 							setStreamingMessage(null);
 							maybeGenerateTitle();
 						}}
-						onChatStreamError={(message) =>
+						onChatStreamError={message =>
 							setStreamingMessage({
 								content: message,
 								type: "ERROR",

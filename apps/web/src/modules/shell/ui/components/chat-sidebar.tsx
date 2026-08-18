@@ -77,14 +77,8 @@ export const ChatSidebar = () => {
 							onReset={reset}
 							fallbackRender={({ resetErrorBoundary }) => (
 								<div className="flex flex-col items-start gap-2 px-4 py-6">
-									<p className="text-xs text-muted-foreground">
-										Couldn&apos;t load your chats.
-									</p>
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={resetErrorBoundary}
-									>
+									<p className="text-xs text-muted-foreground">Couldn&apos;t load your chats.</p>
+									<Button size="sm" variant="outline" onClick={resetErrorBoundary}>
 										Retry
 									</Button>
 								</div>

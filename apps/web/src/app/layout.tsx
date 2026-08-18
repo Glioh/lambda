@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "katex/dist/katex.min.css";
-import { TRPCReactProvider } from "@/trpc/client";
+import { QueryProvider } from "@/lib/query-provider";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "next-themes";
 import { ClerkProvider } from "@clerk/nextjs";
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 	description: "Chat with Lambda — ask about UI, React, Next.js, and coding.",
 };
 
-/** Provides authentication, RPC, theme, font, and toast context for every route. */
+/** Provides authentication, query, theme, font, and toast context for every route. */
 export default function RootLayout({
 	children,
 }: Readonly<{
@@ -36,11 +36,9 @@ export default function RootLayout({
 				},
 			}}
 		>
-			<TRPCReactProvider>
+			<QueryProvider>
 				<html lang="en" suppressHydrationWarning>
-					<body
-						className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-					>
+					<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
 						<ThemeProvider
 							attribute="class"
 							defaultTheme="system"
@@ -52,7 +50,7 @@ export default function RootLayout({
 						</ThemeProvider>
 					</body>
 				</html>
-			</TRPCReactProvider>
+			</QueryProvider>
 		</ClerkProvider>
 	);
 }

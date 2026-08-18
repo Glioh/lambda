@@ -53,10 +53,7 @@ export function planContextWindow<T extends { content: string }>({
 		estimateMessageTokens(message.content) + (extraTokens?.(message) ?? 0);
 
 	const summaryTokens = summaryContent ? estimateTokens(summaryContent) : 0;
-	const historyTokens = messages.reduce(
-		(total, message) => total + costOf(message),
-		0,
-	);
+	const historyTokens = messages.reduce((total, message) => total + costOf(message), 0);
 	const estimatedTokens = fixedTokens + summaryTokens + historyTokens;
 
 	const overBudget = estimatedTokens > compactionTriggerTokens(config);

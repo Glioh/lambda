@@ -1,14 +1,8 @@
 import { prepareChat } from "./prepare-chat";
 import { runChatCompletion } from "./run-completion";
-import type {
-	CompleteChat,
-	CompleteChatDependencies,
-	CompleteChatInput,
-} from "./types";
+import type { CompleteChat, CompleteChatDependencies, CompleteChatInput } from "./types";
 
-export function createCompleteChat(
-	dependencies: CompleteChatDependencies,
-): CompleteChat {
+export function createCompleteChat(dependencies: CompleteChatDependencies): CompleteChat {
 	return async ({ userId, projectId, messageId, signal }) => {
 		const project = await dependencies.store.findProject({ projectId, userId });
 		if (!project) return { kind: "not-found" };

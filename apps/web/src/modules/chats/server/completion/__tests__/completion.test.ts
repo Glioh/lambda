@@ -24,7 +24,7 @@ async function* tokens(values: string[]) {
 }
 
 async function* delayedTokens(values: string[], delayMs: number) {
-	await new Promise((resolve) => setTimeout(resolve, delayMs));
+	await new Promise(resolve => setTimeout(resolve, delayMs));
 	yield* tokens(values);
 }
 
@@ -39,11 +39,9 @@ function waitForAbort(signal: AbortSignal): Promise<never> {
 			reject(new DOMException("Aborted", "AbortError"));
 			return;
 		}
-		signal.addEventListener(
-			"abort",
-			() => reject(new DOMException("Aborted", "AbortError")),
-			{ once: true },
-		);
+		signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), {
+			once: true,
+		});
 	});
 }
 
@@ -116,22 +114,21 @@ function createHarness(options: HarnessOptions = {}) {
 		},
 		findLatestMessage: async () => {
 			options.onFindLatestMessage?.();
-			const id = options.latestMessageId === undefined
-				? (options.trigger?.id ?? "message_1")
-				: options.latestMessageId;
+			const id =
+				options.latestMessageId === undefined
+					? (options.trigger?.id ?? "message_1")
+					: options.latestMessageId;
 			return id ? { id } : null;
 		},
 		findLatestCheckpoint: async () => options.checkpoint ?? null,
 		findHistory: async () => options.history ?? [],
-		findImagePayloads: async (ids) => {
+		findImagePayloads: async ids => {
 			imageLookups.push(ids);
-			return ids.flatMap((id) =>
-				options.imageData?.[id]
-					? [{ id, mimeType: "image/png", data: options.imageData[id] }]
-					: [],
+			return ids.flatMap(id =>
+				options.imageData?.[id] ? [{ id, mimeType: "image/png", data: options.imageData[id] }] : [],
 			);
 		},
-		saveMessage: async (message) => {
+		saveMessage: async message => {
 			await options.onSaveMessage?.(message);
 			savedMessages.push(message);
 		},
@@ -139,9 +136,7 @@ function createHarness(options: HarnessOptions = {}) {
 	const model: ChatCompletionModel = {
 		stream: async (...args) => {
 			requests.push(args[0]);
-			return options.modelStream
-				? options.modelStream(...args)
-				: tokens(["Answer"]);
+			return options.modelStream ? options.modelStream(...args) : tokens(["Answer"]);
 		},
 	};
 
@@ -272,9 +267,7 @@ describe("completeChat", () => {
 		const harness = createHarness({
 			trigger: triggerMessage({
 				content: "",
-				attachments: [
-					{ id: "image_1", mimeType: "image/png", width: 512, height: 512 },
-				],
+				attachments: [{ id: "image_1", mimeType: "image/png", width: 512, height: 512 }],
 			}),
 			imageData: { image_1: "QUJD" },
 		});
@@ -293,10 +286,8 @@ describe("completeChat", () => {
 		const harness = createHarness({
 			contextConfig: tinyContextConfig,
 			history: overBudgetHistory(),
-			modelStream: async (request) =>
-				request.purpose === "compaction"
-					? tokens(["Summary ", "text."])
-					: tokens(["Answer"]),
+			modelStream: async request =>
+				request.purpose === "compaction" ? tokens(["Summary ", "text."]) : tokens(["Answer"]),
 		});
 		assert.deepEqual(await runHarness(harness), [
 			{ kind: "thinking" },
@@ -332,34 +323,30 @@ describe("completeChat", () => {
 	it("never shortens base timeout for image requests", async () => {
 		const harness = createHarness({
 			trigger: triggerMessage({
-				attachments: [
-					{ id: "image_1", mimeType: "image/png", width: 512, height: 512 },
-				],
+				attachments: [{ id: "image_1", mimeType: "image/png", width: 512, height: 512 }],
 			}),
 			imageData: { image_1: "QUJD" },
 			modelStream: async () => delayedTokens(["Answer"], 10),
 			timeoutMs: 30,
 			visionTimeoutMs: 1,
 		});
-		assert.deepEqual((await runHarness(harness)).map((event) => event.kind), [
-			"thinking",
-			"token",
-			"done",
-		]);
+		assert.deepEqual(
+			(await runHarness(harness)).map(event => event.kind),
+			["thinking", "token", "done"],
+		);
 	});
 
-	it("turns model failure into one persisted Chat error", async (test) => {
+	it("turns model failure into one persisted Chat error", async test => {
 		const errorLog = test.mock.method(console, "error", () => undefined);
 		const harness = createHarness({
 			modelStream: async () => {
 				throw new Error("provider unavailable");
 			},
 		});
-		assert.deepEqual((await runHarness(harness)).map((event) => event.kind), [
-			"thinking",
-			"error",
-			"done",
-		]);
+		assert.deepEqual(
+			(await runHarness(harness)).map(event => event.kind),
+			["thinking", "error", "done"],
+		);
 		assert.equal(harness.savedMessages.length, 1);
 		assert.equal(harness.savedMessages[0].type, "ERROR");
 		assert.equal(errorLog.mock.callCount(), 1);
@@ -371,7 +358,7 @@ describe("completeChat", () => {
 		const deferredTasks: Array<() => Promise<void>> = [];
 		const harness = createHarness({
 			modelStream: async (_request, signal) => tokenUntilAborted(signal),
-			scheduleDeferred: (task) => deferredTasks.push(task),
+			scheduleDeferred: task => deferredTasks.push(task),
 		});
 		const result = await harness.completeChat({
 			userId: "user_1",
@@ -396,21 +383,21 @@ describe("completeChat", () => {
 		]);
 	});
 
-	it("keeps deferred settlement alive until an in-flight write fails", async (test) => {
+	it("keeps deferred settlement alive until an in-flight write fails", async test => {
 		const errorLog = test.mock.method(console, "error", () => undefined);
 		const controller = new AbortController();
 		const deferredTasks: Array<() => Promise<void>> = [];
 		let markSaveStarted!: () => void;
 		let rejectSave!: (error: Error) => void;
-		const saveStarted = new Promise<void>((resolve) => {
+		const saveStarted = new Promise<void>(resolve => {
 			markSaveStarted = resolve;
 		});
 		const pendingSave = new Promise<void>((_, reject) => {
 			rejectSave = reject;
 		});
 		const harness = createHarness({
-			scheduleDeferred: (task) => deferredTasks.push(task),
-			onSaveMessage: async (message) => {
+			scheduleDeferred: task => deferredTasks.push(task),
+			onSaveMessage: async message => {
 				if (message.type !== "RESULT") return;
 				markSaveStarted();
 				await pendingSave;
@@ -444,21 +431,21 @@ describe("completeChat", () => {
 		assert.deepEqual(await iterator.next(), { value: undefined, done: true });
 	});
 
-	it("continues when provider compaction fails", async (test) => {
+	it("continues when provider compaction fails", async test => {
 		test.mock.method(console, "error", () => undefined);
 		const harness = createHarness({
 			contextConfig: tinyContextConfig,
 			history: overBudgetHistory(),
-			modelStream: async (request) => {
+			modelStream: async request => {
 				if (request.purpose === "compaction") throw new Error("unavailable");
 				return tokens(["Answer"]);
 			},
 		});
 		await runHarness(harness);
-		assert.deepEqual(harness.requests.map((request) => request.purpose), [
-			"compaction",
-			"chat",
-		]);
+		assert.deepEqual(
+			harness.requests.map(request => request.purpose),
+			["compaction", "chat"],
+		);
 		assert.deepEqual(harness.savedMessages, [
 			{ projectId: "project_1", content: "Answer", type: "RESULT" },
 		]);
@@ -468,18 +455,17 @@ describe("completeChat", () => {
 		const harness = createHarness({
 			contextConfig: tinyContextConfig,
 			history: overBudgetHistory(),
-			modelStream: async (request) =>
-				request.purpose === "compaction"
-					? tokens(["Summary"])
-					: tokens(["Answer"]),
-			onSaveMessage: async (message) => {
+			modelStream: async request =>
+				request.purpose === "compaction" ? tokens(["Summary"]) : tokens(["Answer"]),
+			onSaveMessage: async message => {
 				if (message.type === "SUMMARY") throw new Error("database unavailable");
 			},
 		});
 		await assert.rejects(runHarness(harness), /database unavailable/);
-		assert.deepEqual(harness.requests.map((request) => request.purpose), [
-			"compaction",
-		]);
+		assert.deepEqual(
+			harness.requests.map(request => request.purpose),
+			["compaction"],
+		);
 	});
 
 	it("replays existing checkpoint without compacting", async () => {
@@ -490,7 +476,10 @@ describe("completeChat", () => {
 			},
 		});
 		await runHarness(harness);
-		assert.deepEqual(harness.requests.map((request) => request.purpose), ["chat"]);
+		assert.deepEqual(
+			harness.requests.map(request => request.purpose),
+			["chat"],
+		);
 		assert.match(JSON.stringify(harness.requests[0].messages[1]), /CHECKPOINT_SUMMARY/);
 	});
 
@@ -502,7 +491,7 @@ describe("completeChat", () => {
 				(async function* () {
 					await waitForAbort(signal);
 				})(),
-			scheduleDeferred: (task) => deferredTasks.push(task),
+			scheduleDeferred: task => deferredTasks.push(task),
 		});
 		const result = await harness.completeChat({
 			userId: "user_1",
@@ -530,10 +519,8 @@ describe("completeChat", () => {
 				{ id: "image_1", mimeType: "image/png", width: 512, height: 512 },
 			]),
 			imageData: { image_1: base64 },
-			modelStream: async (request) =>
-				request.purpose === "compaction"
-					? tokens(["Summary"])
-					: tokens(["Answer"]),
+			modelStream: async request =>
+				request.purpose === "compaction" ? tokens(["Summary"]) : tokens(["Answer"]),
 		});
 		await runHarness(harness);
 		const compactionBody = JSON.stringify(harness.requests[0]);
@@ -548,7 +535,11 @@ describe("completeChat", () => {
 			reserveOutputTokens: 20,
 		};
 		const historyFor = (withImage: boolean): ChatHistoryMessage[] => [
-			{ role: "USER", content: "b", createdAt: new Date("2026-01-01T00:00:01Z") },
+			{
+				role: "USER",
+				content: "b",
+				createdAt: new Date("2026-01-01T00:00:01Z"),
+			},
 			{
 				role: "ASSISTANT",
 				content: "c",
@@ -572,23 +563,27 @@ describe("completeChat", () => {
 					: {}),
 			},
 		];
-		const withoutImage = createHarness({ contextConfig, history: historyFor(false) });
+		const withoutImage = createHarness({
+			contextConfig,
+			history: historyFor(false),
+		});
 		const withImage = createHarness({
 			contextConfig,
 			history: historyFor(true),
 			imageData: { image_1: "QUJD" },
-			modelStream: async (request) =>
-				request.purpose === "compaction"
-					? tokens(["Summary"])
-					: tokens(["Answer"]),
+			modelStream: async request =>
+				request.purpose === "compaction" ? tokens(["Summary"]) : tokens(["Answer"]),
 		});
 		await runHarness(withoutImage);
 		await runHarness(withImage);
-		assert.deepEqual(withoutImage.requests.map((request) => request.purpose), ["chat"]);
-		assert.deepEqual(withImage.requests.map((request) => request.purpose), [
-			"compaction",
-			"chat",
-		]);
+		assert.deepEqual(
+			withoutImage.requests.map(request => request.purpose),
+			["chat"],
+		);
+		assert.deepEqual(
+			withImage.requests.map(request => request.purpose),
+			["compaction", "chat"],
+		);
 	});
 
 	it("caps images and degrades remaining images to markers", async () => {
@@ -601,9 +596,7 @@ describe("completeChat", () => {
 				role: "USER",
 				content: `Message ${index}`,
 				createdAt: new Date(`2026-01-01T00:00:0${index + 1}Z`),
-				attachments: [
-					{ id, mimeType: "image/png", width: 512, height: 512 },
-				],
+				attachments: [{ id, mimeType: "image/png", width: 512, height: 512 }],
 			});
 		}
 		const harness = createHarness({
@@ -612,14 +605,12 @@ describe("completeChat", () => {
 			contextConfig: { ...DEFAULT_CONTEXT_CONFIG, maxImagesInContext: 2 },
 		});
 		await runHarness(harness);
-		const parts = harness.requests[0].messages.flatMap((message) =>
+		const parts = harness.requests[0].messages.flatMap(message =>
 			Array.isArray(message.content) ? message.content : [],
 		);
-		assert.equal(parts.filter((part) => part.kind === "image").length, 2);
+		assert.equal(parts.filter(part => part.kind === "image").length, 2);
 		assert.equal(
-			parts.filter(
-				(part) => part.kind === "text" && part.text.startsWith("[image omitted"),
-			).length,
+			parts.filter(part => part.kind === "text" && part.text.startsWith("[image omitted")).length,
 			4,
 		);
 		assert.equal(harness.imageLookups[0].length, 2);

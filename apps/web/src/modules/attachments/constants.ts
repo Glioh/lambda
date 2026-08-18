@@ -4,12 +4,7 @@
  */
 
 /** Allowlist. Anything outside this set is rejected — see validate.ts for why. */
-export const ACCEPTED_IMAGE_TYPES = [
-	"image/png",
-	"image/jpeg",
-	"image/webp",
-	"image/gif",
-] as const;
+export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 
 /** MIME type accepted by attachment upload pipeline. */
 export type AcceptedImageType = (typeof ACCEPTED_IMAGE_TYPES)[number];
@@ -24,7 +19,7 @@ export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
 
 /**
  * Total decoded bytes per message. 3 MB decoded is ~4 MB once base64-encoded,
- * which keeps the whole tRPC request under the 4.5 MB body limit most hosts
+ * which keeps whole HTTP request under 4.5 MB body limit most hosts
  * enforce — the caps exist to stay under that, not for storage reasons.
  */
 export const MAX_TOTAL_ATTACHMENT_BYTES = 3 * 1024 * 1024;

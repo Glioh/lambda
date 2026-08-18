@@ -4,11 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckIcon, CopyIcon, PencilIcon, RotateCcwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 /** How long the copy button shows its confirmation state. */
@@ -104,10 +100,7 @@ export const MessageActions = ({
 			clearTimeout(resetTimerRef.current);
 		}
 
-		resetTimerRef.current = setTimeout(
-			() => setCopied(false),
-			COPIED_FEEDBACK_MS,
-		);
+		resetTimerRef.current = setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS);
 	}, [content]);
 
 	return (
@@ -129,11 +122,7 @@ export const MessageActions = ({
 							onClick={handleCopy}
 							className="size-7 text-muted-foreground hover:text-foreground"
 						>
-							{copied ? (
-								<CheckIcon className="size-3.5" />
-							) : (
-								<CopyIcon className="size-3.5" />
-							)}
+							{copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
 						</Button>
 					</TooltipTrigger>
 					<TooltipContent>{copied ? "Copied" : "Copy"}</TooltipContent>

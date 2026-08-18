@@ -1,14 +1,9 @@
 import type { PreparedChat } from "./prepare-chat";
-import type {
-	ChatCompletionEvent,
-	ChatCompletionModel,
-	ChatStore,
-} from "./types";
+import type { ChatCompletionEvent, ChatCompletionModel, ChatStore } from "./types";
 
 const COMPLETION_ERROR_MESSAGE =
 	"Something went wrong while generating the response. Please try again.";
-const COMPLETION_TIMEOUT_MESSAGE =
-	"Chat response timed out. Please try again.";
+const COMPLETION_TIMEOUT_MESSAGE = "Chat response timed out. Please try again.";
 
 class CompletionModelFailure extends Error {
 	constructor(cause: unknown) {
@@ -54,9 +49,7 @@ class EventQueue implements AsyncIterable<ChatCompletionEvent> {
 				if (value) return { value, done: false };
 				if (this.failure) throw this.failure;
 				if (this.closed) return { value: undefined, done: true };
-				return new Promise((resolve, reject) =>
-					this.waiters.push({ resolve, reject }),
-				);
+				return new Promise((resolve, reject) => this.waiters.push({ resolve, reject }));
 			},
 		};
 	}
@@ -64,7 +57,7 @@ class EventQueue implements AsyncIterable<ChatCompletionEvent> {
 
 function timeoutAfter(milliseconds: number) {
 	let timer: ReturnType<typeof setTimeout>;
-	const promise = new Promise<"timeout">((resolve) => {
+	const promise = new Promise<"timeout">(resolve => {
 		timer = setTimeout(() => resolve("timeout"), milliseconds);
 	});
 	return { promise, cancel: () => clearTimeout(timer) };
@@ -86,10 +79,7 @@ export function runChatCompletion(
 	let content = "";
 	let clientGone = false;
 	let terminalPersistence: Promise<void> | null = null;
-	const persistOnce = async (
-		messageContent: string,
-		type: "RESULT" | "ERROR",
-	): Promise<void> => {
+	const persistOnce = async (messageContent: string, type: "RESULT" | "ERROR"): Promise<void> => {
 		if (terminalPersistence) return terminalPersistence;
 		const pending = dependencies.store.saveMessage({
 			projectId: prepared.projectId,
@@ -136,10 +126,7 @@ export function runChatCompletion(
 				completedSummary = summary.trim() || null;
 			} catch (error) {
 				if (modelController.signal.aborted) throw error;
-				console.error(
-					"Context compaction failed; continuing without checkpoint update.",
-					error,
-				);
+				console.error("Context compaction failed; continuing without checkpoint update.", error);
 			}
 
 			if (completedSummary) {
@@ -182,9 +169,7 @@ export function runChatCompletion(
 					? Math.max(dependencies.timeoutMs, dependencies.visionTimeoutMs)
 					: dependencies.timeoutMs,
 			);
-			const outcome = await Promise.race([completion, timeout.promise]).finally(
-				timeout.cancel,
-			);
+			const outcome = await Promise.race([completion, timeout.promise]).finally(timeout.cancel);
 
 			if (outcome === "timeout") {
 				modelController.abort();

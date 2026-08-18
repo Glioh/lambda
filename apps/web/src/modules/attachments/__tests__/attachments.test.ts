@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-	AttachmentValidationError,
-	validateAttachments,
-} from "@/modules/attachments/lib/validate";
+import { AttachmentValidationError, validateAttachments } from "@/modules/attachments/lib/validate";
 import {
 	MAX_ATTACHMENT_BYTES,
 	MAX_ATTACHMENTS_PER_MESSAGE,
@@ -19,9 +16,7 @@ const PNG_1X1 =
  * signature, so size limits can be tested independently of the magic-byte check.
  */
 const pngOfSize = (bytes: number): string => {
-	const signature = Buffer.from([
-		0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
-	]);
+	const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 	return Buffer.concat([
 		signature,
 		Buffer.alloc(Math.max(0, bytes - signature.length), 0x61),
@@ -54,18 +49,12 @@ describe("validateAttachments", () => {
 		// so all four of these can reach the server.
 		const signatures: Array<[string, number[]]> = [
 			["image/jpeg", [0xff, 0xd8, 0xff, 0xe0]],
-			[
-				"image/webp",
-				[0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
-			],
+			["image/webp", [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]],
 			["image/gif", [0x47, 0x49, 0x46, 0x38]],
 		];
 
 		for (const [mimeType, bytes] of signatures) {
-			const data = Buffer.concat([
-				Buffer.from(bytes),
-				Buffer.alloc(16, 0x00),
-			]).toString("base64");
+			const data = Buffer.concat([Buffer.from(bytes), Buffer.alloc(16, 0x00)]).toString("base64");
 
 			const [result] = validateAttachments([attachment({ mimeType, data })]);
 			assert.equal(result.mimeType, mimeType);
@@ -88,10 +77,7 @@ describe("validateAttachments", () => {
 		]).toString("base64");
 
 		assert.throws(
-			() =>
-				validateAttachments([
-					attachment({ mimeType: "image/png", data: jpegBytes }),
-				]),
+			() => validateAttachments([attachment({ mimeType: "image/png", data: jpegBytes })]),
 			AttachmentValidationError,
 		);
 	});
@@ -105,10 +91,7 @@ describe("validateAttachments", () => {
 
 	it("rejects a single image over the per-image cap", () => {
 		assert.throws(
-			() =>
-				validateAttachments([
-					attachment({ data: pngOfSize(MAX_ATTACHMENT_BYTES + 1024) }),
-				]),
+			() => validateAttachments([attachment({ data: pngOfSize(MAX_ATTACHMENT_BYTES + 1024) })]),
 			// Asserts the per-image message specifically, so this can't silently
 			// start passing via the total-cap branch instead.
 			(error: Error) =>
@@ -135,19 +118,14 @@ describe("validateAttachments", () => {
 		assert.throws(
 			() =>
 				validateAttachments(
-					Array.from({ length: MAX_ATTACHMENTS_PER_MESSAGE + 1 }, () =>
-						attachment(),
-					),
+					Array.from({ length: MAX_ATTACHMENTS_PER_MESSAGE + 1 }, () => attachment()),
 				),
 			AttachmentValidationError,
 		);
 	});
 
 	it("rejects non-positive or non-integer dimensions", () => {
-		assert.throws(
-			() => validateAttachments([attachment({ width: 0 })]),
-			AttachmentValidationError,
-		);
+		assert.throws(() => validateAttachments([attachment({ width: 0 })]), AttachmentValidationError);
 		assert.throws(
 			() => validateAttachments([attachment({ height: 1.5 })]),
 			AttachmentValidationError,

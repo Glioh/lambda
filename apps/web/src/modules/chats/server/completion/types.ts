@@ -15,8 +15,7 @@ export type ChatCompletionEvent =
 	| { kind: "done" };
 
 export type ChatCompletionResult =
-	| { kind: "not-found" }
-	| { kind: "started"; events: AsyncIterable<ChatCompletionEvent> };
+	{ kind: "not-found" } | { kind: "started"; events: AsyncIterable<ChatCompletionEvent> };
 
 export interface ChatAttachment {
 	id: string;
@@ -39,10 +38,7 @@ export interface PersistedTriggerMessage extends ChatHistoryMessage {
 }
 
 export interface ChatStore {
-	findProject(input: {
-		projectId: string;
-		userId: string;
-	}): Promise<{ id: string } | null>;
+	findProject(input: { projectId: string; userId: string }): Promise<{ id: string } | null>;
 	findMessage(messageId: string): Promise<PersistedTriggerMessage | null>;
 	findLatestMessage(projectId: string): Promise<{ id: string } | null>;
 	findLatestCheckpoint(input: {
@@ -55,9 +51,7 @@ export interface ChatStore {
 		before: Date;
 		limit: number;
 	}): Promise<ChatHistoryMessage[]>;
-	findImagePayloads(
-		ids: string[],
-	): Promise<Array<{ id: string; mimeType: string; data: string }>>;
+	findImagePayloads(ids: string[]): Promise<Array<{ id: string; mimeType: string; data: string }>>;
 	saveMessage(message: {
 		projectId: string;
 		content: string;
@@ -68,10 +62,7 @@ export interface ChatStore {
 
 export type ChatCompletionContent =
 	| string
-	| Array<
-			| { kind: "text"; text: string }
-			| { kind: "image"; dataUrl: string; detail: "high" }
-	  >;
+	| Array<{ kind: "text"; text: string } | { kind: "image"; dataUrl: string; detail: "high" }>;
 
 export interface ChatCompletionRequest {
 	purpose: "chat" | "compaction";
@@ -83,10 +74,7 @@ export interface ChatCompletionRequest {
 }
 
 export interface ChatCompletionModel {
-	stream(
-		request: ChatCompletionRequest,
-		signal: AbortSignal,
-	): Promise<AsyncIterable<string>>;
+	stream(request: ChatCompletionRequest, signal: AbortSignal): Promise<AsyncIterable<string>>;
 }
 
 export interface CompleteChatDependencies {
@@ -98,6 +86,4 @@ export interface CompleteChatDependencies {
 	scheduleDeferred(task: () => Promise<void>): void;
 }
 
-export type CompleteChat = (
-	input: CompleteChatInput,
-) => Promise<ChatCompletionResult>;
+export type CompleteChat = (input: CompleteChatInput) => Promise<ChatCompletionResult>;

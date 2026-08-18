@@ -88,12 +88,8 @@ export async function streamChatCompletion(
 			for (const event of events) {
 				const lines = event.split("\n");
 				const eventName =
-					lines
-						.find((line) => line.startsWith("event: "))
-						?.slice("event: ".length) ?? "message";
-				const data = lines
-					.find((line) => line.startsWith("data: "))
-					?.slice("data: ".length);
+					lines.find(line => line.startsWith("event: "))?.slice("event: ".length) ?? "message";
+				const data = lines.find(line => line.startsWith("data: "))?.slice("data: ".length);
 
 				if (!data) {
 					continue;
@@ -110,9 +106,7 @@ export async function streamChatCompletion(
 				};
 
 				if (eventName === "error") {
-					handlers.onError?.(
-						parsed.error ?? "Something went wrong. Please try again.",
-					);
+					handlers.onError?.(parsed.error ?? "Something went wrong. Please try again.");
 					continue;
 				}
 

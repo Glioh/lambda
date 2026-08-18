@@ -32,9 +32,7 @@ export function shouldAutoStartResponse({
 	stopped,
 	hasInitialized,
 }: AutoStartState): boolean {
-	return (
-		isLastMessageUser && !hasStreamingMessage && !stopped && !hasInitialized
-	);
+	return isLastMessageUser && !hasStreamingMessage && !stopped && !hasInitialized;
 }
 
 /**

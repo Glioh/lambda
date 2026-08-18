@@ -33,9 +33,7 @@ export interface StickToBottom<T extends HTMLElement> {
  * @param {unknown[]} deps - Values that indicate content grew (message count, streamed text).
  * @returns {StickToBottom} Refs and handlers for the scroll container.
  */
-export function useStickToBottom<T extends HTMLElement>(
-	deps: unknown[],
-): StickToBottom<T> {
+export function useStickToBottom<T extends HTMLElement>(deps: unknown[]): StickToBottom<T> {
 	const scrollRef = useRef<T>(null);
 	const isFollowingRef = useRef(true);
 	const [isAtBottom, setIsAtBottom] = useState(true);
@@ -47,8 +45,7 @@ export function useStickToBottom<T extends HTMLElement>(
 			return;
 		}
 
-		const distanceFromBottom =
-			element.scrollHeight - element.scrollTop - element.clientHeight;
+		const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
 		const atBottom = distanceFromBottom < NEAR_BOTTOM_PX;
 
 		isFollowingRef.current = atBottom;

@@ -2,13 +2,7 @@
 
 import Link from "next/link";
 import { useAuth, useClerk, useUser } from "@clerk/nextjs";
-import {
-	ChevronsUpDownIcon,
-	CrownIcon,
-	LogOutIcon,
-	SettingsIcon,
-	SunMoonIcon,
-} from "lucide-react";
+import { ChevronsUpDownIcon, CrownIcon, LogOutIcon, SettingsIcon, SunMoonIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -25,11 +19,7 @@ import {
 	DropdownMenuSubTrigger,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-	SidebarMenu,
-	SidebarMenuButton,
-	SidebarMenuItem,
-} from "@/components/ui/sidebar";
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
 
 /**
  * Derives up to two initials for the avatar fallback.
@@ -37,10 +27,7 @@ import {
  * @param {string | undefined} email - The user's email, used when there's no name.
  * @returns {string} One or two uppercase initials.
  */
-const initialsFor = (
-	name: string | null | undefined,
-	email: string | undefined,
-): string => {
+const initialsFor = (name: string | null | undefined, email: string | undefined): string => {
 	const source = name?.trim() || email?.split("@")[0] || "";
 	const parts = source.split(/[\s._-]+/).filter(Boolean);
 
@@ -50,7 +37,7 @@ const initialsFor = (
 
 	return parts
 		.slice(0, 2)
-		.map((part) => part[0]?.toUpperCase() ?? "")
+		.map(part => part[0]?.toUpperCase() ?? "")
 		.join("");
 };
 
@@ -73,10 +60,7 @@ export const SidebarUserMenu = () => {
 			<SidebarMenuItem>
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<SidebarMenuButton
-							size="lg"
-							className="data-[state=open]:bg-sidebar-accent"
-						>
+						<SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent">
 							<Avatar className="size-7 rounded-md">
 								<AvatarImage src={user?.imageUrl} alt="" />
 								<AvatarFallback className="rounded-md text-xs">
@@ -84,9 +68,7 @@ export const SidebarUserMenu = () => {
 								</AvatarFallback>
 							</Avatar>
 							<div className="grid flex-1 text-left leading-tight">
-								<span className="truncate text-sm font-medium">
-									{isLoaded ? displayName : "…"}
-								</span>
+								<span className="truncate text-sm font-medium">{isLoaded ? displayName : "…"}</span>
 								<span className="truncate text-xs text-muted-foreground">
 									{hasProAccess ? "Pro plan" : "Free plan"}
 								</span>
@@ -131,19 +113,10 @@ export const SidebarUserMenu = () => {
 							</DropdownMenuSubTrigger>
 							<DropdownMenuPortal>
 								<DropdownMenuSubContent>
-									<DropdownMenuRadioGroup
-										value={theme}
-										onValueChange={setTheme}
-									>
-										<DropdownMenuRadioItem value="light">
-											Light
-										</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="dark">
-											Dark
-										</DropdownMenuRadioItem>
-										<DropdownMenuRadioItem value="system">
-											System
-										</DropdownMenuRadioItem>
+									<DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+										<DropdownMenuRadioItem value="light">Light</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="dark">Dark</DropdownMenuRadioItem>
+										<DropdownMenuRadioItem value="system">System</DropdownMenuRadioItem>
 									</DropdownMenuRadioGroup>
 								</DropdownMenuSubContent>
 							</DropdownMenuPortal>

@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { MessageRole, MessageType } from "@prisma/client";
+import type { Message } from "@lambda/api-contracts";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ChevronRightIcon, SparklesIcon } from "lucide-react";
@@ -11,6 +11,9 @@ import {
 	MessageAttachments,
 	type MessageAttachment,
 } from "@/modules/attachments/ui/components/message-attachments";
+
+type MessageRole = Message["role"];
+type MessageType = Message["type"];
 
 interface UserMessageProps {
 	content: string;
@@ -95,14 +98,10 @@ const SummaryDivider = ({ content }: SummaryDividerProps) => {
 				<summary className="flex cursor-pointer list-none items-center gap-2 text-xs text-muted-foreground">
 					<SparklesIcon className="size-3.5 shrink-0" />
 					<span className="font-medium">Chat compacted</span>
-					<span className="hidden sm:inline opacity-70">
-						— earlier messages summarized
-					</span>
+					<span className="hidden sm:inline opacity-70">— earlier messages summarized</span>
 					<ChevronRightIcon className="ml-auto size-3.5 shrink-0 transition-transform group-open/summary:rotate-90" />
 				</summary>
-				<p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">
-					{content}
-				</p>
+				<p className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{content}</p>
 			</details>
 		</div>
 	);
@@ -142,13 +141,7 @@ const AssistantMessage = ({
 			)}
 		>
 			<div className="flex items-center gap-2 pl-2 mb-2">
-				<Image
-					src="/logo.svg"
-					alt="Lambda Logo"
-					width={18}
-					height={18}
-					className="shrink-0"
-				/>
+				<Image src="/logo.svg" alt="Lambda Logo" width={18} height={18} className="shrink-0" />
 				<span className="text-sm font-medium">Lambda</span>
 				<span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
 					{format(createdAt, "HH:mm 'on' MMM dd, yyyy")}

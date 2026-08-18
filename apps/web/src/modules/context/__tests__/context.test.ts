@@ -11,11 +11,7 @@ import {
 	estimateTokens,
 } from "../tokens";
 import { planContextWindow } from "../window";
-import {
-	SUMMARY_PREAMBLE,
-	buildCompactionMessages,
-	buildSummaryContextBlock,
-} from "../compaction";
+import { SUMMARY_PREAMBLE, buildCompactionMessages, buildSummaryContextBlock } from "../compaction";
 
 const config: ContextConfig = {
 	contextTokenBudget: 400,
@@ -159,9 +155,7 @@ describe("planContextWindow", () => {
 
 	it("shrinks the verbatim tail as the fixed prompt grows (budgets the whole request)", () => {
 		// 8 messages of ~20 tokens each = ~160 tokens of history.
-		const messages = Array.from({ length: 8 }, (_, i) =>
-			messageOfTokens(16, `m${i + 1}`),
-		);
+		const messages = Array.from({ length: 8 }, (_, i) => messageOfTokens(16, `m${i + 1}`));
 
 		// Small fixed prompt: the tail allowance is large, so more is kept verbatim.
 		const smallFixed = planContextWindow({
@@ -194,10 +188,7 @@ describe("planContextWindow", () => {
 	});
 
 	it("skips compaction when there is nothing older to fold", () => {
-		const messages = [
-			messageOfTokens(500, "huge-1"),
-			messageOfTokens(500, "huge-2"),
-		];
+		const messages = [messageOfTokens(500, "huge-1"), messageOfTokens(500, "huge-2")];
 
 		const plan = planContextWindow({
 			summaryContent: null,
@@ -249,10 +240,7 @@ describe("buildSummaryContextBlock", () => {
 
 describe("estimateImageTokens", () => {
 	it("charges a flat rate for low-detail images", () => {
-		assert.equal(
-			estimateImageTokens(4000, 3000, "low"),
-			LOW_DETAIL_IMAGE_TOKENS,
-		);
+		assert.equal(estimateImageTokens(4000, 3000, "low"), LOW_DETAIL_IMAGE_TOKENS);
 	});
 
 	it("charges per 512px tile after scaling the short edge to 768", () => {
@@ -356,9 +344,7 @@ describe("buildCompactionMessages with attachments", () => {
 	});
 
 	it("omits the placeholder entirely when there are no attachments", () => {
-		const messages = buildCompactionMessages(null, [
-			{ role: "USER", content: "no images here" },
-		]);
+		const messages = buildCompactionMessages(null, [{ role: "USER", content: "no images here" }]);
 
 		assert.equal(messages[1].content.includes("[image attached"), false);
 	});

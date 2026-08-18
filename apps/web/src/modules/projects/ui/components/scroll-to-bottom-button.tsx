@@ -20,10 +20,7 @@ export const ScrollToBottomButton = ({ onClick, className }: Props) => {
 			variant="outline"
 			aria-label="Scroll to bottom"
 			onClick={onClick}
-			className={cn(
-				"size-8 rounded-full border bg-background shadow-md",
-				className,
-			)}
+			className={cn("size-8 rounded-full border bg-background shadow-md", className)}
 		>
 			<ArrowDownIcon className="size-4" />
 		</Button>

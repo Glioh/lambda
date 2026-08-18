@@ -61,7 +61,7 @@ export const ChatListItem = ({ chat }: Props) => {
 						// preventDefault so the menu's close animation doesn't race the
 						// dialog mount — without it the dialog opens and immediately
 						// loses focus to the unmounting menu.
-						onSelect={(event) => {
+						onSelect={event => {
 							event.preventDefault();
 							setRenameOpen(true);
 						}}
@@ -71,7 +71,7 @@ export const ChatListItem = ({ chat }: Props) => {
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						variant="destructive"
-						onSelect={(event) => {
+						onSelect={event => {
 							event.preventDefault();
 							setDeleteOpen(true);
 						}}

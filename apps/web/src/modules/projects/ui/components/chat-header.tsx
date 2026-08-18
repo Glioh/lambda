@@ -17,7 +17,10 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UserControl } from "@/components/user-control";
 import { DeleteChatDialog } from "@/modules/shell/ui/components/delete-chat-dialog";
 import { RenameChatDialog } from "@/modules/shell/ui/components/rename-chat-dialog";
-import { useTRPC } from "@/trpc/client";
+import { ApiError } from "@/api/client";
+import { api } from "@/api/browser";
+import { queryKeys } from "@/api/query-keys";
+import { projectQueries } from "@/api/queries";
 
 interface Props {
 	projectId: string;
@@ -31,14 +34,11 @@ interface Props {
  * @returns {JSX.Element} The rendered chat header.
  */
 export const ChatHeader = ({ projectId }: Props) => {
-	const trpc = useTRPC();
 	const { has, isLoaded } = useAuth();
 	const [renameOpen, setRenameOpen] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
 
-	const { data: project } = useSuspenseQuery(
-		trpc.projects.getOne.queryOptions({ id: projectId }),
-	);
+	const { data: project } = useSuspenseQuery(projectQueries.detail(projectId));
 
 	const hasProAccess = isLoaded ? has?.({ plan: "pro" }) : undefined;
 
@@ -60,7 +60,7 @@ export const ChatHeader = ({ projectId }: Props) => {
 				</DropdownMenuTrigger>
 				<DropdownMenuContent side="bottom" align="start" className="w-44">
 					<DropdownMenuItem
-						onSelect={(event) => {
+						onSelect={event => {
 							event.preventDefault();
 							setRenameOpen(true);
 						}}
@@ -70,7 +70,7 @@ export const ChatHeader = ({ projectId }: Props) => {
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						variant="destructive"
-						onSelect={(event) => {
+						onSelect={event => {
 							event.preventDefault();
 							setDeleteOpen(true);
 						}}

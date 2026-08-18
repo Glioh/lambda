@@ -24,10 +24,7 @@ describe("shouldAutoStartResponse", () => {
 		// ending on a USER message with no preview on screen — identical to the
 		// handoff except for `stopped`. Without that flag the interrupted prompt
 		// was immediately re-run and answered again.
-		assert.equal(
-			shouldAutoStartResponse({ ...handoff, stopped: true }),
-			false,
-		);
+		assert.equal(shouldAutoStartResponse({ ...handoff, stopped: true }), false);
 	});
 
 	it("does NOT restart when a stop happened via the composer", () => {
@@ -45,34 +42,22 @@ describe("shouldAutoStartResponse", () => {
 	});
 
 	it("does not start while a response is already on screen", () => {
-		assert.equal(
-			shouldAutoStartResponse({ ...handoff, hasStreamingMessage: true }),
-			false,
-		);
+		assert.equal(shouldAutoStartResponse({ ...handoff, hasStreamingMessage: true }), false);
 	});
 
 	it("does not start twice on the same mount", () => {
-		assert.equal(
-			shouldAutoStartResponse({ ...handoff, hasInitialized: true }),
-			false,
-		);
+		assert.equal(shouldAutoStartResponse({ ...handoff, hasInitialized: true }), false);
 	});
 
 	it("does not start when the chat already ends on an answer", () => {
-		assert.equal(
-			shouldAutoStartResponse({ ...handoff, isLastMessageUser: false }),
-			false,
-		);
+		assert.equal(shouldAutoStartResponse({ ...handoff, isLastMessageUser: false }), false);
 	});
 
 	it("starts again once a stop is cleared by a new send", () => {
 		// Sending (or regenerating) clears `stopped`, re-arming the handoff path.
 		const afterStop = { ...handoff, stopped: true };
 		assert.equal(shouldAutoStartResponse(afterStop), false);
-		assert.equal(
-			shouldAutoStartResponse({ ...afterStop, stopped: false }),
-			true,
-		);
+		assert.equal(shouldAutoStartResponse({ ...afterStop, stopped: false }), true);
 	});
 });
 

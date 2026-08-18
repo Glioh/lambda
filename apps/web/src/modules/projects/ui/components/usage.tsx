@@ -19,9 +19,7 @@ export const Usage = ({ points, msBeforeNext }: Props) => {
 	const [remainingMs, setRemainingMs] = useState(0);
 
 	useEffect(() => {
-		const safeMsBeforeNext = Number.isFinite(msBeforeNext)
-			? Math.max(0, msBeforeNext)
-			: 0;
+		const safeMsBeforeNext = Number.isFinite(msBeforeNext) ? Math.max(0, msBeforeNext) : 0;
 		const resetAt = Date.now() + safeMsBeforeNext;
 
 		const updateRemaining = () => {

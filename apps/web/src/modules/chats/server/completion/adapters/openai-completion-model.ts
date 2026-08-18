@@ -1,9 +1,5 @@
 import "server-only";
-import type {
-	ChatCompletionContent,
-	ChatCompletionModel,
-	ChatCompletionRequest,
-} from "../types";
+import type { ChatCompletionContent, ChatCompletionModel, ChatCompletionRequest } from "../types";
 
 interface OpenAIStreamChunk {
 	choices?: Array<{ delta?: { content?: string | null } }>;
@@ -15,7 +11,7 @@ type Fetcher = typeof fetch;
 function toOpenAIContent(content: ChatCompletionContent) {
 	if (typeof content === "string") return content;
 
-	return content.map((part) =>
+	return content.map(part =>
 		part.kind === "text"
 			? { type: "text" as const, text: part.text }
 			: {
@@ -25,9 +21,7 @@ function toOpenAIContent(content: ChatCompletionContent) {
 	);
 }
 
-async function* parseOpenAIStream(
-	body: ReadableStream<Uint8Array>,
-): AsyncGenerator<string> {
+async function* parseOpenAIStream(body: ReadableStream<Uint8Array>): AsyncGenerator<string> {
 	const reader = body.getReader();
 	const decoder = new TextDecoder();
 	let buffer = "";
@@ -54,9 +48,7 @@ async function* parseOpenAIStream(
 
 					const chunk = JSON.parse(data) as OpenAIStreamChunk;
 					if (chunk.error) {
-						throw new Error(
-							chunk.error.message ?? "OpenAI Chat stream failed.",
-						);
+						throw new Error(chunk.error.message ?? "OpenAI Chat stream failed.");
 					}
 					const token = chunk.choices?.[0]?.delta?.content;
 					if (token) yield token;
@@ -81,26 +73,23 @@ export class OpenAICompletionModel implements ChatCompletionModel {
 			throw new Error("OPENAI_API_KEY is not configured.");
 		}
 
-		const response = await this.fetcher(
-			"https://api.openai.com/v1/chat/completions",
-			{
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Authorization: `Bearer ${this.apiKey}`,
-				},
-				body: JSON.stringify({
-					model: this.model,
-					messages: request.messages.map((message) => ({
-						role: message.role,
-						content: toOpenAIContent(message.content),
-					})),
-					stream: true,
-					...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
-				}),
-				signal,
+		const response = await this.fetcher("https://api.openai.com/v1/chat/completions", {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				Authorization: `Bearer ${this.apiKey}`,
 			},
-		);
+			body: JSON.stringify({
+				model: this.model,
+				messages: request.messages.map(message => ({
+					role: message.role,
+					content: toOpenAIContent(message.content),
+				})),
+				stream: true,
+				...(request.maxTokens ? { max_tokens: request.maxTokens } : {}),
+			}),
+			signal,
+		});
 
 		if (!response.ok || !response.body) {
 			const detail = response.ok

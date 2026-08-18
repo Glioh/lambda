@@ -9,8 +9,10 @@ import { Form, FormField } from "@/components/ui/form";
 import TextareaAutosize from "react-textarea-autosize";
 import { ArrowUpIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTRPC } from "@/trpc/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { ApiError } from "@/api/client";
+import { api } from "@/api/browser";
+import { queryKeys } from "@/api/query-keys";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAttachments } from "@/modules/attachments/hooks/use-attachments";
@@ -27,7 +29,6 @@ const formSchema = z.object({
 /** Creates chat project from prompt and optional image attachments. */
 export const ProjectForm = () => {
 	const router = useRouter();
-	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const {
 		attachments,
@@ -48,37 +49,27 @@ export const ProjectForm = () => {
 	// the component memoizable instead of opting it out of the compiler.
 	const watchedValue = useWatch({ control: form.control, name: "value" });
 
-	const createProject = useMutation(
-		trpc.projects.create.mutationOptions({
-			onSuccess: (data) => {
-				queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-
-				router.push(`/projects/${data.id}`);
-				queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-			},
-			onError: (error) => {
-				toast.error(error.message);
-
-				if (error.data?.code === "UNAUTHORIZED") {
-					router.push("/sign-in");
-					return;
-				}
-
-				if (error.data?.code === "TOO_MANY_REQUESTS") {
-					router.push("/pricing");
-				}
-			},
-		}),
-	);
+	const createProject = useMutation({
+		mutationFn: (input: { value: string; attachments?: ReturnType<typeof attachmentsToInput> }) =>
+			api.projects.create(input),
+		onSuccess: data => {
+			queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+			queryClient.invalidateQueries({ queryKey: queryKeys.usage });
+			router.push(`/projects/${data.id}`);
+		},
+		onError: error => {
+			toast.error(error.message);
+			if (error instanceof ApiError && error.code === "UNAUTHORIZED") router.push("/sign-in");
+			if (error instanceof ApiError && error.code === "TOO_MANY_REQUESTS") router.push("/pricing");
+		},
+	});
 
 	const onSubmit = (values: z.infer<typeof formSchema>) => {
 		const pendingAttachments = attachmentsToInput();
 
 		createProject.mutate({
 			value: values.value,
-			...(pendingAttachments.length > 0
-				? { attachments: pendingAttachments }
-				: {}),
+			...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
 		});
 	};
 
@@ -86,10 +77,7 @@ export const ProjectForm = () => {
 	const isPending = createProject.isPending;
 	const hasText = (watchedValue ?? "").trim().length > 0;
 	const isButtonDisabled =
-		isPending ||
-		isPreparing ||
-		!form.formState.isValid ||
-		(!hasText && attachments.length === 0);
+		isPending || isPreparing || !form.formState.isValid || (!hasText && attachments.length === 0);
 
 	return (
 		<Form {...form}>
@@ -100,8 +88,8 @@ export const ProjectForm = () => {
 						"relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all",
 						isFocused && "shadow-xs",
 					)}
-					onDragOver={(event) => event.preventDefault()}
-					onDrop={(event) => {
+					onDragOver={event => event.preventDefault()}
+					onDrop={event => {
 						// Ignore drops once the chat is being created — the files would
 						// never make it into the request that's already in flight.
 						if (isPending || isPreparing) {
@@ -114,11 +102,7 @@ export const ProjectForm = () => {
 						}
 					}}
 				>
-					<AttachmentStrip
-						attachments={attachments}
-						onRemove={removeAt}
-						disabled={isPending}
-					/>
+					<AttachmentStrip attachments={attachments} onRemove={removeAt} disabled={isPending} />
 					<FormField
 						control={form.control}
 						name="value"
@@ -132,7 +116,7 @@ export const ProjectForm = () => {
 								maxRows={8}
 								className="pt-4 resize-none border-none w-full outline-none bg-transparent"
 								placeholder="Type your message here..."
-								onKeyDown={(e) => {
+								onKeyDown={e => {
 									if (e.key === "Enter" && !e.shiftKey) {
 										e.preventDefault();
 
@@ -151,11 +135,7 @@ export const ProjectForm = () => {
 					/>
 					<div className="flex gap-x-2 items-center justify-between pt-2">
 						<div className="flex items-center gap-1">
-							<AttachmentButton
-								onFiles={addFiles}
-								disabled={isPending}
-								isPreparing={isPreparing}
-							/>
+							<AttachmentButton onFiles={addFiles} disabled={isPending} isPreparing={isPreparing} />
 							<div className="text-[10px] text-muted-foreground font-mono">
 								<kbd
 									className="pointer-events-none inline-flex h-5 select-none items-center gap-1
@@ -174,11 +154,7 @@ export const ProjectForm = () => {
 								isButtonDisabled && "bg-muted-foreground border",
 							)}
 						>
-							{isPending ? (
-								<Loader2Icon className="size-4 animate-spin" />
-							) : (
-								<ArrowUpIcon />
-							)}
+							{isPending ? <Loader2Icon className="size-4 animate-spin" /> : <ArrowUpIcon />}
 						</Button>
 					</div>
 				</form>

@@ -27,7 +27,7 @@ export const AttachmentButton = ({ onFiles, disabled, isPreparing }: Props) => {
 				accept={ACCEPTED_IMAGE_TYPES.join(",")}
 				multiple
 				className="hidden"
-				onChange={(event) => {
+				onChange={event => {
 					// Snapshot before resetting: `files` is a live FileList that the
 					// reset below empties. This is safe today only because the handler
 					// reads it synchronously — copying makes it stay safe.

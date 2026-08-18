@@ -47,7 +47,7 @@ export const MessageAttachments = ({ attachments }: Props) => {
 
 	return (
 		<div className="flex flex-wrap justify-end gap-2 pb-2">
-			{attachments.map((attachment) => {
+			{attachments.map(attachment => {
 				const size = fitWithin(attachment.width, attachment.height);
 
 				return (

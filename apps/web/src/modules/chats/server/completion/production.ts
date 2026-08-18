@@ -17,5 +17,5 @@ export const completeChat = createCompleteChat({
 	contextConfig: DEFAULT_CONTEXT_CONFIG,
 	timeoutMs: envMs("CHAT_TIMEOUT_MS", 45_000),
 	visionTimeoutMs: envMs("CHAT_VISION_TIMEOUT_MS", 90_000),
-	scheduleDeferred: (task) => after(task),
+	scheduleDeferred: task => after(task),
 });

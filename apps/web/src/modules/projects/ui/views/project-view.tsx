@@ -31,18 +31,14 @@ export const ProjectView = ({ projectId }: Props) => {
 			>
 				<Suspense
 					fallback={
-						<div className="shrink-0 border-b p-3 text-sm text-muted-foreground">
-							Loading chat…
-						</div>
+						<div className="shrink-0 border-b p-3 text-sm text-muted-foreground">Loading chat…</div>
 					}
 				>
 					<ChatHeader projectId={projectId} />
 				</Suspense>
 			</ErrorBoundary>
 
-			<ErrorBoundary
-				fallback={<p className="p-4">Error loading messages</p>}
-			>
+			<ErrorBoundary fallback={<p className="p-4">Error loading messages</p>}>
 				<Suspense fallback={<p className="p-4">Loading messages...</p>}>
 					{/* Keyed by chat so switching chats remounts: streaming state, the
 					    stop/stopped flags, and the scroll position all reset on their

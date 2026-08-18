@@ -8,7 +8,7 @@ import {
 	SidebarGroupLabel,
 	SidebarMenu,
 } from "@/components/ui/sidebar";
-import { useTRPC } from "@/trpc/client";
+import { projectQueries } from "@/api/queries";
 import { groupChatsByRecency } from "@/modules/shell/lib/group-chats";
 import { ChatListItem } from "./chat-list-item";
 
@@ -38,18 +38,11 @@ const subscribeToDayRollover = (onChange: () => void): (() => void) => {
  * @returns {JSX.Element} The rendered chat list.
  */
 export const ChatList = () => {
-	const trpc = useTRPC();
-	const { data: chats } = useSuspenseQuery(
-		trpc.projects.getMany.queryOptions(),
-	);
+	const { data: chats } = useSuspenseQuery(projectQueries.list());
 
 	// The server's day and the viewer's day can differ by timezone; useSyncExternalStore
 	// re-renders with the client's value after hydration rather than mismatching.
-	const dayStart = useSyncExternalStore(
-		subscribeToDayRollover,
-		getDayStart,
-		getDayStart,
-	);
+	const dayStart = useSyncExternalStore(subscribeToDayRollover, getDayStart, getDayStart);
 
 	if (chats.length === 0) {
 		return (
@@ -59,17 +52,20 @@ export const ChatList = () => {
 		);
 	}
 
-	// `projects.getMany` already orders newest-first, which is what the grouper expects.
-	const groups = groupChatsByRecency(chats, dayStart);
+	// API already orders newest-first, which is what grouper expects.
+	const groups = groupChatsByRecency(
+		chats.map(chat => ({ ...chat, updatedAt: new Date(chat.updatedAt) })),
+		dayStart,
+	);
 
 	return (
 		<>
-			{groups.map((group) => (
+			{groups.map(group => (
 				<SidebarGroup key={group.label}>
 					<SidebarGroupLabel>{group.label}</SidebarGroupLabel>
 					<SidebarGroupContent>
 						<SidebarMenu>
-							{group.chats.map((chat) => (
+							{group.chats.map(chat => (
 								<ChatListItem key={chat.id} chat={chat} />
 							))}
 						</SidebarMenu>

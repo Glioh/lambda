@@ -50,8 +50,7 @@ export async function prepareChat(
 	let summaryContent = checkpoint?.content ?? null;
 	const imageTokensFor = (message: ChatHistoryMessage): number =>
 		(message.attachments ?? []).reduce(
-			(total, attachment) =>
-				total + estimateImageTokens(attachment.width, attachment.height),
+			(total, attachment) => total + estimateImageTokens(attachment.width, attachment.height),
 			0,
 		);
 	const plan = planContextWindow({
@@ -87,10 +86,7 @@ export async function prepareChat(
 		? await store.findImagePayloads([...selectedImageIds])
 		: [];
 	const imageDataUrls = new Map(
-		imagePayloads.map((image) => [
-			image.id,
-			`data:${image.mimeType};base64,${image.data}`,
-		]),
+		imagePayloads.map(image => [image.id, `data:${image.mimeType};base64,${image.data}`]),
 	);
 	const toContent = (message: ChatHistoryMessage): ChatCompletionContent => {
 		const attachments = message.attachments ?? [];
@@ -126,9 +122,7 @@ export async function prepareChat(
 						messages: buildCompactionMessages(summaryContent, plan.head),
 						maxTokens: contextConfig.summaryMaxTokens,
 					},
-					...(plan.head.at(-1)?.createdAt
-						? { checkpointAt: plan.head.at(-1)?.createdAt }
-						: {}),
+					...(plan.head.at(-1)?.createdAt ? { checkpointAt: plan.head.at(-1)?.createdAt } : {}),
 				}
 			: null,
 		acceptSummary(summary) {
@@ -147,7 +141,10 @@ export async function prepareChat(
 			}
 
 			for (const message of plan.tail) {
-				messages.push({ role: toRole(message.role), content: toContent(message) });
+				messages.push({
+					role: toRole(message.role),
+					content: toContent(message),
+				});
 			}
 
 			messages.push({ role: "user", content: toContent(triggerMessage) });

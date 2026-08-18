@@ -62,10 +62,7 @@ export function validateContextConfig(config: ContextConfig): ContextConfig {
 	// envInt already floors this at a positive value, so this only catches a
 	// hand-constructed config — but a zero here would silently drop every image
 	// from the context rather than failing loudly.
-	if (
-		!Number.isInteger(config.maxImagesInContext) ||
-		config.maxImagesInContext < 1
-	) {
+	if (!Number.isInteger(config.maxImagesInContext) || config.maxImagesInContext < 1) {
 		throw new Error(
 			`Invalid context config: maxImagesInContext (${config.maxImagesInContext}) must be a positive integer.`,
 		);

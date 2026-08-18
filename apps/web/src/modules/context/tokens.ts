@@ -24,10 +24,7 @@ export function estimateMessageTokens(content: string): number {
  * Estimates the total token cost of a list of message contents.
  */
 export function estimateMessagesTokens(contents: string[]): number {
-	return contents.reduce(
-		(total, content) => total + estimateMessageTokens(content),
-		0,
-	);
+	return contents.reduce((total, content) => total + estimateMessageTokens(content), 0);
 }
 
 /** Flat cost of a `detail: "low"` image. */
@@ -80,8 +77,7 @@ export function estimateImageTokens(
 		scaledHeight *= shrink;
 	}
 
-	const tiles =
-		Math.ceil(scaledWidth / TILE_SIZE) * Math.ceil(scaledHeight / TILE_SIZE);
+	const tiles = Math.ceil(scaledWidth / TILE_SIZE) * Math.ceil(scaledHeight / TILE_SIZE);
 
 	return LOW_DETAIL_IMAGE_TOKENS + HIGH_DETAIL_TILE_TOKENS * tiles;
 }

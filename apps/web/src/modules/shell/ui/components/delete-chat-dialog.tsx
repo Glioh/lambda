@@ -13,7 +13,8 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useTRPC } from "@/trpc/client";
+import { api } from "@/api/browser";
+import { queryKeys } from "@/api/query-keys";
 
 interface Props {
 	open: boolean;
@@ -30,41 +31,33 @@ interface Props {
  * @param {Props} props - The dialog props.
  * @returns {JSX.Element} The rendered delete confirmation.
  */
-export const DeleteChatDialog = ({
-	open,
-	onOpenChange,
-	chatId,
-	chatName,
-	isActive,
-}: Props) => {
-	const trpc = useTRPC();
+export const DeleteChatDialog = ({ open, onOpenChange, chatId, chatName, isActive }: Props) => {
 	const queryClient = useQueryClient();
 	const router = useRouter();
 
-	const remove = useMutation(
-		trpc.projects.remove.mutationOptions({
-			onSuccess: ({ id }) => {
-				// Drop the chat's cache outright — nothing can render it now, and
-				// leaving it would resurrect the chat in the list on a refocus refetch.
-				queryClient.removeQueries({
-					queryKey: trpc.messages.getMany.queryKey({ projectId: id }),
-				});
-				queryClient.removeQueries({
-					queryKey: trpc.projects.getOne.queryKey({ id }),
-				});
+	const remove = useMutation({
+		mutationFn: () => api.projects.remove(chatId),
+		onSuccess: ({ id }) => {
+			// Drop the chat's cache outright — nothing can render it now, and
+			// leaving it would resurrect the chat in the list on a refocus refetch.
+			queryClient.removeQueries({
+				queryKey: queryKeys.messages(id),
+			});
+			queryClient.removeQueries({
+				queryKey: queryKeys.project(id),
+			});
 
-				if (isActive) {
-					router.push("/");
-				}
+			if (isActive) {
+				router.push("/");
+			}
 
-				// Same ordering as rename: the delete already succeeded, so close
-				// immediately rather than waiting on the list refetch.
-				onOpenChange(false);
-				queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-			},
-			onError: (error) => toast.error(error.message),
-		}),
-	);
+			// Same ordering as rename: the delete already succeeded, so close
+			// immediately rather than waiting on the list refetch.
+			onOpenChange(false);
+			queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+		},
+		onError: error => toast.error(error.message),
+	});
 
 	return (
 		<AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -72,22 +65,19 @@ export const DeleteChatDialog = ({
 				<AlertDialogHeader>
 					<AlertDialogTitle>Delete chat?</AlertDialogTitle>
 					<AlertDialogDescription>
-						<span className="font-medium text-foreground">{chatName}</span> and
-						all of its messages will be permanently deleted. This can&apos;t be
-						undone.
+						<span className="font-medium text-foreground">{chatName}</span> and all of its messages
+						will be permanently deleted. This can&apos;t be undone.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
 				<AlertDialogFooter>
-					<AlertDialogCancel disabled={remove.isPending}>
-						Cancel
-					</AlertDialogCancel>
+					<AlertDialogCancel disabled={remove.isPending}>Cancel</AlertDialogCancel>
 					<AlertDialogAction
 						disabled={remove.isPending}
-						onClick={(event) => {
+						onClick={event => {
 							// Keep the dialog open until the mutation settles, so a failure
 							// surfaces against the thing it failed on.
 							event.preventDefault();
-							remove.mutate({ id: chatId });
+							remove.mutate();
 						}}
 						className="bg-destructive text-white hover:bg-destructive/90"
 					>

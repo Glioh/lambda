@@ -29,11 +29,7 @@ export const AppShell = ({ defaultOpen, children }: Props) => {
 	// sidebar is already handled inside SidebarProvider.)
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent) => {
-			if (
-				event.key.toLowerCase() === "o" &&
-				event.shiftKey &&
-				(event.metaKey || event.ctrlKey)
-			) {
+			if (event.key.toLowerCase() === "o" && event.shiftKey && (event.metaKey || event.ctrlKey)) {
 				event.preventDefault();
 				router.push("/");
 			}

@@ -40,10 +40,9 @@ describe("OpenAICompletionModel", () => {
 		};
 		const model = new OpenAICompletionModel(fetcher as typeof fetch, "key", "model");
 
-		assert.deepEqual(
-			await collect(await model.stream(request, new AbortController().signal)),
-			["Hello"],
-		);
+		assert.deepEqual(await collect(await model.stream(request, new AbortController().signal)), [
+			"Hello",
+		]);
 		assert.deepEqual(sentBody, {
 			model: "model",
 			messages: [{ role: "user", content: "Hello" }],
@@ -54,11 +53,8 @@ describe("OpenAICompletionModel", () => {
 	});
 
 	it("throws streamed provider errors", async () => {
-		const responseBody = responseStream(
-			'data: {"error":{"message":"quota exceeded"}}\n\n',
-		);
-		const fetcher = async () =>
-			new Response(responseBody.body);
+		const responseBody = responseStream('data: {"error":{"message":"quota exceeded"}}\n\n');
+		const fetcher = async () => new Response(responseBody.body);
 		const model = new OpenAICompletionModel(fetcher as typeof fetch, "key");
 		const stream = await model.stream(request, new AbortController().signal);
 
