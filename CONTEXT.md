@@ -86,7 +86,7 @@ Runtime direction:
 
 Web
  ↓
-tRPC / HTTP / SSE
+HTTP / SSE
  ↓
 Fastify
  ↓
@@ -99,8 +99,9 @@ PostgreSQL / external providers
 Responsibilities:
 
 - Next.js owns the web application.
-- Fastify owns backend HTTP/server infrastructure.
-- tRPC is a transport for the web client, not the business architecture.
+- Fastify owns Lambda's application HTTP API. Normal application operations use
+  REST-style HTTP routes, streaming operations use SSE, and client contracts are
+  defined by explicit API schemas rather than tRPC router inference.
 - Services own Lambda behavior and business rules.
 - Repositories own persistence mechanics.
 - Integrations own communication with external vendors/protocols.
@@ -126,6 +127,7 @@ For detailed architecture decisions, read:
 
 - `docs/adr/0001-project-workspace-and-conversation-ownership.md`
 - `docs/adr/0002-chat-is-the-canonical-term.md`
+- `docs/adr/0003-standardize-application-api-on-fastify-http.md`
 
 If this file conflicts with an accepted ADR, the ADR wins.
 

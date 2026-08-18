@@ -1,0 +1,61 @@
+# ADR 0003: Standardize Lambda Application APIs on Fastify HTTP
+
+- Status: Accepted
+- Date: 2026-08-18
+
+## Decision
+
+Lambda application operations use Fastify-owned HTTP routes. Normal CRUD and
+application operations use REST-style HTTP semantics. Streaming AI responses use
+SSE. WebSocket or other realtime protocols are added only when a real feature
+requires one.
+
+tRPC is intentionally removed from Lambda's target architecture. Client type
+safety comes from explicit API request/response schemas and contracts rather than
+`AppRouter` inference. TanStack Query remains the web query and cache layer, used
+over a typed HTTP client.
+
+The target flow is:
+
+```text
+apps/web
+  -> HTTP / SSE
+  -> apps/api / Fastify
+  -> services
+  -> repositories / integrations
+  -> PostgreSQL / external providers
+```
+
+Fastify routes are transport-only. They own authentication, input validation,
+HTTP status and error mapping, serialization, and SSE mechanics where applicable.
+Business behavior lives in services. Persistence lives in repositories. External
+systems live in integrations.
+
+## Why
+
+Fastify is becoming a true standalone API boundary, and Lambda will eventually
+support a separate mobile repository. Maintaining tRPC, HTTP, and SSE creates two
+normal application API styles. One explicit HTTP contract is easier to understand,
+document, test, reuse, and expose to future clients. Converting directly now
+avoids moving tRPC into Fastify only to remove it later.
+
+## Consequences
+
+- The web client keeps TanStack Query but uses a small typed HTTP API client.
+- Normal API contracts use explicit schemas for params, query, bodies, successful
+  responses, and useful expected errors.
+- Timestamps such as `createdAt` and `updatedAt` are serialized as ISO-8601
+  strings over HTTP.
+- A consistent error envelope is preferred, for example
+  `{ "error": { "code": "NOT_FOUND", "message": "Project not found." } }`.
+- Route schemas remain the source of truth and should be suitable for future
+  OpenAPI generation; a separately maintained hand-written OpenAPI file is not
+  required.
+- Unauthorized resource access may remain an indistinguishable 404 where needed
+  to prevent resource-existence disclosure.
+
+## Relationship to earlier ADRs
+
+This ADR supersedes transport-specific tRPC guidance elsewhere in the repository.
+It does not supersede ADR 0001's valid domain, ownership, isolation, or transaction
+decisions, or ADR 0002's canonical Chat terminology.

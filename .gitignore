@@ -53,6 +53,7 @@ next-env.d.ts
 *.md
 # Track task/audit docs
 !tasks/*.md
+!docs/adr/*.md
 
 # Ignore specific files
 prd.json
