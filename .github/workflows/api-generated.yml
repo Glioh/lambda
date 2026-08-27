@@ -17,3 +17,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:api-generated
+      - name: Verify generated API output is committed
+        run: |
+          changes="$(git status --porcelain -- \
+            apps/api/openapi \
+            packages/api-client/src/generated)"
+
+          if [ -n "$changes" ]; then
+            echo "Generated API output is not clean:"
+            echo "$changes"
+            exit 1
+          fi

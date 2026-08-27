@@ -1,0 +1,30 @@
+apis:
+  lambda:
+    root: apps/api/openapi/openapi.json
+
+extends:
+  - spec
+
+rules:
+  operation-operationId: error
+  operation-operationId-url-safe: error
+  operation-2xx-response: error
+
+  component-name-unique:
+    severity: error
+    schemas: error
+    parameters: error
+    responses: error
+    requestBodies: error
+
+  no-unused-components: error
+  no-schema-type-mismatch: error
+  no-required-schema-properties-undefined: error
+  no-enum-type-mismatch: error
+
+  rule/no-counter-schema-names:
+    subject:
+      type: NamedSchemas
+    assertions:
+      notPattern: /^def-?\d+$/i
+    message: Component schemas must use semantic names instead of generated def-* names.
