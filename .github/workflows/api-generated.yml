@@ -26,5 +26,21 @@ jobs:
           if [ -n "$changes" ]; then
             echo "Generated API output is not clean:"
             echo "$changes"
+
+            echo
+            echo "Generated diff:"
+            git diff -- \
+              apps/api/openapi \
+              packages/api-client/src/generated
+
+            untracked="$(git ls-files --others --exclude-standard -- \
+              apps/api/openapi \
+              packages/api-client/src/generated)"
+            if [ -n "$untracked" ]; then
+              echo
+              echo "Untracked generated files:"
+              echo "$untracked"
+            fi
+
             exit 1
           fi
