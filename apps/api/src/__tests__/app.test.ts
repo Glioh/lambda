@@ -3,7 +3,7 @@ import { afterEach, describe, it } from "node:test";
 import type { FastifyInstance } from "fastify";
 import Fastify from "fastify";
 import { Type, type TSchema } from "typebox";
-import * as contracts from "@lambda/api-contracts";
+import * as contracts from "../contracts/index.js";
 import { buildApp } from "../app.js";
 import type { ApiRouteDependencies } from "../http/routes/dependencies.js";
 import { DEFAULT_HOST, DEFAULT_PORT, getServerConfig } from "../config.js";

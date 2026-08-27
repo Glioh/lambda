@@ -10,7 +10,7 @@
 		"./types": "./src/generated/types/index.ts"
 	},
 	"scripts": {
-		"generate": "kubb generate --config ./kubb.config.ts && npx --no-install prettier src/generated --write",
+		"generate": "kubb generate --config ./kubb.config.ts && npx --no-install prettier --config ../../.prettierrc src/generated --write",
 		"test": "node --experimental-test-module-mocks --import tsx --test src/*.test.ts",
 		"typecheck": "tsc --noEmit"
 	},

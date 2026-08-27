@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import type { Message } from "@lambda/api-contracts";
+import type { Message } from "@lambda/api-client/types";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ChevronRightIcon, SparklesIcon } from "lucide-react";

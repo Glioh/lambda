@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-	transpilePackages: ["@lambda/api-client", "@lambda/api-contracts"],
+	transpilePackages: ["@lambda/api-client"],
 	async rewrites() {
 		const apiUrl = process.env.API_URL ?? "http://localhost:4000";
 		return [

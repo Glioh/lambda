@@ -1,4 +1,4 @@
-import type { Message } from "@lambda/api-contracts";
+import type { Message } from "@lambda/api-client/types";
 
 type MessageType = Message["type"];
 

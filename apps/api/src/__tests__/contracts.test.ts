@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CreateMessageBodySchema, CreateProjectBodySchema, ErrorResponseSchema, MAX_ATTACHMENT_BYTES, MAX_TOTAL_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, } from "@lambda/api-contracts";
+import { CreateMessageBodySchema, CreateProjectBodySchema, ErrorResponseSchema, MAX_ATTACHMENT_BYTES, MAX_TOTAL_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, } from "../contracts/index.js";
 import { validateAttachments, AttachmentValidationError } from "../attachments/validation.js";
 import { rollbackScope } from "../messages/rollback.js";
 import { ATTACHMENT_REQUEST_BODY_LIMIT } from "../http/attachment-limits.js";

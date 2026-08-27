@@ -1,6 +1,6 @@
 import { generateSlug } from "random-word-slugs";
 import { Type } from "typebox";
-import { CreateProjectBodySchema, ErrorResponseSchema, GenerateTitleResponseSchema, ProjectIdParamsSchema, ProjectIdResponseSchema, ProjectListItemSchema, ProjectSchema, RenameProjectBodySchema, RenameProjectResponseSchema, schemaRef, } from "@lambda/api-contracts";
+import { CreateProjectBodySchema, ErrorResponseSchema, GenerateTitleResponseSchema, ProjectIdParamsSchema, ProjectIdResponseSchema, ProjectListItemSchema, ProjectSchema, RenameProjectBodySchema, RenameProjectResponseSchema, schemaRef, } from "../../contracts/index.js";
 import { validateAttachments, AttachmentValidationError } from "../../attachments/validation.js";
 import { ATTACHMENT_REQUEST_BODY_LIMIT } from "../attachment-limits.js";
 import { serializeProject, serializeProjectListItem } from "../serializers.js";

@@ -1,5 +1,5 @@
 import { getAuthPrincipal } from "../../auth/clerk-auth.js";
-import { schemaRef, UsageSchema } from "@lambda/api-contracts";
+import { schemaRef, UsageSchema } from "../../contracts/index.js";
 import { defaultRouteDependencies, type ApiRouteDependencies } from "./dependencies.js";
 import type { ApiFastifyInstance } from "./types.js";
 

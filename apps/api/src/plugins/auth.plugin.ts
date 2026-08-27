@@ -1,6 +1,6 @@
 import { clerkPlugin } from "@clerk/fastify";
 import fp from "fastify-plugin";
-import { ErrorResponseSchema, schemaRef } from "@lambda/api-contracts";
+import { ErrorResponseSchema, schemaRef } from "../contracts/index.js";
 import { resolveClerkPrincipal } from "../auth/clerk-auth.js";
 import type { PrincipalResolver } from "../auth/auth-principal.js";
 

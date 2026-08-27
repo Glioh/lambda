@@ -1,5 +1,5 @@
 import { Type } from "typebox";
-import { CreateMessageBodySchema, EditMessageBodySchema, ErrorResponseSchema, MessageParamsSchema, MessageSchema, ProjectIdParamsSchema, RollbackResponseSchema, schemaRef, type RollbackResult, } from "@lambda/api-contracts";
+import { CreateMessageBodySchema, EditMessageBodySchema, ErrorResponseSchema, MessageParamsSchema, MessageSchema, ProjectIdParamsSchema, RollbackResponseSchema, schemaRef, type RollbackResult, } from "../../contracts/index.js";
 import { validateAttachments, AttachmentValidationError } from "../../attachments/validation.js";
 import { rollbackScope } from "../../messages/rollback.js";
 import { ATTACHMENT_REQUEST_BODY_LIMIT } from "../attachment-limits.js";

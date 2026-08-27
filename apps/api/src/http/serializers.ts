@@ -1,4 +1,4 @@
-import type { Message, Project, ProjectListItem } from "@lambda/api-contracts";
+import type { Message, Project, ProjectListItem } from "../contracts/index.js";
 
 type ProjectListRecord = Omit<ProjectListItem, "createdAt" | "updatedAt"> & {
 	createdAt: Date;
