@@ -5,7 +5,7 @@ import Fastify from "fastify";
 import { Type, type TSchema } from "typebox";
 import * as contracts from "@lambda/api-contracts";
 import { buildApp } from "../app.js";
-import type { ApiRouteDependencies } from "../http/routes/index.js";
+import type { ApiRouteDependencies } from "../http/routes/dependencies.js";
 import { DEFAULT_HOST, DEFAULT_PORT, getServerConfig } from "../config.js";
 
 describe("API application", () => {
@@ -250,6 +250,27 @@ describe("API application", () => {
 		});
 	});
 
+	it("keeps public routes outside the protected auth scope", async () => {
+		let resolved = 0;
+		app = buildApp({
+			logger: false,
+			principalResolver: () => {
+				resolved += 1;
+				return null;
+			},
+			routeDependencies,
+		});
+
+		const health = await app.inject({ method: "GET", url: "/api/health" });
+		const openapi = await app.inject({ method: "GET", url: "/api/openapi.json" });
+		const protectedRoute = await app.inject({ method: "GET", url: "/api/projects" });
+
+		assert.equal(health.statusCode, 200);
+		assert.equal(openapi.statusCode, 200);
+		assert.equal(protectedRoute.statusCode, 401);
+		assert.equal(resolved, 1);
+	});
+
 	it("uses Fastify validation errors", async () => {
 		app = buildApp({
 			logger: false,
@@ -315,6 +336,31 @@ describe("API application", () => {
 		});
 
 		const response = await app.inject({ method: "GET", url: "/api/test-error" });
+
+		assert.deepEqual(response.json(), {
+			statusCode: 500,
+			error: "Internal Server Error",
+			message: "Internal Server Error",
+		});
+	});
+
+	it("applies safe error handling to protected routes", async () => {
+		app = buildApp({
+			logger: false,
+			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
+			routeDependencies: {
+				...routeDependencies,
+				prisma: {
+					project: {
+						findMany: async () => {
+							throw new Error("secret protected detail");
+						},
+					},
+				},
+			} as unknown as ApiRouteDependencies,
+		});
+
+		const response = await app.inject({ method: "GET", url: "/api/projects" });
 
 		assert.deepEqual(response.json(), {
 			statusCode: 500,

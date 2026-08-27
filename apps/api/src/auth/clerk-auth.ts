@@ -1,6 +1,6 @@
 import { getAuth } from "@clerk/fastify";
 import type { FastifyRequest } from "fastify";
-import type { AuthPrincipal } from "./auth-principal.js";
+import type { AuthPrincipal, PrincipalResolver } from "./auth-principal.js";
 
 declare module "fastify" {
 	interface FastifyRequest {
@@ -8,15 +8,21 @@ declare module "fastify" {
 	}
 }
 
+export function assertClerkConfigured(): void {
+	if (!process.env.CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
+		throw new Error("Clerk configuration requires CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY.");
+	}
+}
+
 /** Adapts Clerk's request auth to Lambda's principal. */
-export function resolveClerkPrincipal(request: FastifyRequest): AuthPrincipal | null {
+export const resolveClerkPrincipal: PrincipalResolver = request => {
 	const auth = getAuth(request);
 	if (!auth.isAuthenticated || !auth.userId) {
 		return null;
 	}
 
 	return { userId: auth.userId, sessionId: auth.sessionId ?? null };
-}
+};
 
 export function getAuthPrincipal(request: FastifyRequest): AuthPrincipal {
 	if (!request.authPrincipal) {

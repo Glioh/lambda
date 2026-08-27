@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { FastifyInstance } from "fastify";
 import { buildApp } from "../app.js";
-import type { ApiRouteDependencies } from "../http/routes/index.js";
+import type { ApiRouteDependencies } from "../http/routes/dependencies.js";
 
 type FakeMethod = (...args: unknown[]) => unknown;
 type FakeDb = {
