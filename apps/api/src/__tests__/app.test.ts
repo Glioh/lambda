@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import type { FastifyInstance } from "fastify";
-import { reusableSchemas } from "@lambda/api-contracts/reusable-schemas";
+import Fastify from "fastify";
+import { Type, type TSchema } from "typebox";
+import * as contracts from "@lambda/api-contracts";
 import { buildApp } from "../app.js";
 import type { ApiRouteDependencies } from "../http/routes/index.js";
 import { DEFAULT_HOST, DEFAULT_PORT, getServerConfig } from "../config.js";
@@ -57,13 +59,18 @@ describe("API application", () => {
 		assert.equal(document.paths?.["/api/openapi.json"], undefined);
 		const schemaNames = Object.keys(document.components?.schemas ?? {});
 		const registeredSchemas = app.getSchemas() as Record<string, { $id?: string }>;
+		const reusableSchemas = (Object.values(contracts) as unknown[]).filter(
+			(schema): schema is TSchema & { $id: string } =>
+				typeof schema === "object" &&
+				schema !== null &&
+				"~kind" in schema &&
+				typeof (schema as { $id?: unknown }).$id === "string",
+		);
 		for (const schema of reusableSchemas) {
-			const id = (schema as { $id?: string }).$id;
-			assert.equal(typeof id, "string");
-			if (typeof id !== "string") continue;
-			assert.deepEqual(registeredSchemas[id], schema);
-			assert.ok(schemaNames.includes(id));
+			assert.deepEqual(registeredSchemas[schema.$id], schema);
+			assert.ok(schemaNames.includes(schema.$id));
 		}
+		assert.ok(reusableSchemas.length > 0);
 		assert.equal(
 			schemaNames.some(name => /^(?:def-?\d+)$/i.test(name)),
 			false,
@@ -120,6 +127,96 @@ describe("API application", () => {
 				assert.ok(responses?.["401"], `missing protected 401 response for ${path}`);
 			}
 		}
+	});
+
+	it("keeps exported TypeBox schemas without $id route-local", () => {
+		assert.equal(Object.prototype.hasOwnProperty.call(contracts.DateTimeSchema, "$id"), false);
+		assert.equal(contracts.DateTimeSchema["~kind"], "String");
+
+		app = buildApp({
+			logger: false,
+			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
+			routeDependencies,
+		});
+
+		assert.equal(app.getSchemas()["DateTimeSchema"], undefined);
+	});
+
+	it("resolves shared schema references inside protected routes", async () => {
+		app = buildApp({
+			logger: false,
+			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
+			routeDependencies,
+		});
+
+		await app.ready();
+		const projectGet = app.swagger().paths?.["/api/projects/{projectId}"] as {
+			get?: {
+				responses?: {
+					401?: { content?: { "application/json"?: { schema?: unknown } } };
+				};
+			};
+		};
+		assert.deepEqual(projectGet.get?.responses?.[401]?.content?.["application/json"]?.schema, {
+			$ref: "#/components/schemas/ErrorResponse",
+		});
+	});
+
+	it("rejects reusable schemas with invalid $ids", async () => {
+		for (const id of ["", "   ", " Project ", 1]) {
+			const invalidApp = Fastify({ logger: false });
+			invalidApp.register(
+				async instance => {
+					const schema = Type.Object({}, { $id: id as string });
+					const value = (schema as { $id?: unknown }).$id;
+					if (value === undefined) return;
+					if (typeof value !== "string" || value.length === 0 || value !== value.trim()) {
+						throw new Error("Reusable API schemas require a valid non-empty $id.");
+					}
+					instance.addSchema(schema);
+				},
+				{ name: `invalid-schema-${String(id)}` },
+			);
+
+			await assert.rejects(
+				Promise.resolve(invalidApp.ready()),
+				/Reusable API schemas require a valid non-empty \$id\./,
+			);
+			await invalidApp.close();
+		}
+	});
+
+	it("lets Fastify reject duplicate schema $ids", async () => {
+		const duplicateApp = Fastify({ logger: false });
+		duplicateApp.register(
+			async instance => {
+				instance.addSchema(Type.Object({}, { $id: "Duplicate" }));
+				instance.addSchema(Type.String({ $id: "Duplicate" }));
+			},
+			{ name: "duplicate-schema" },
+		);
+
+		await assert.rejects(
+			Promise.resolve(duplicateApp.ready()),
+			/Schema with id 'Duplicate' already declared!/,
+		);
+		await duplicateApp.close();
+	});
+
+	it("ignores exported objects with $id that are not TypeBox schemas", async () => {
+		const unrelated = { $id: "NotATypeBoxSchema" };
+		app = Fastify({ logger: false });
+		app.register(
+			async instance => {
+				if (typeof unrelated === "object" && unrelated !== null && "~kind" in unrelated) {
+					instance.addSchema(unrelated);
+				}
+			},
+			{ name: "ignore-non-typebox" },
+		);
+
+		await app.ready();
+		assert.equal(app.getSchemas()["NotATypeBoxSchema"], undefined);
 	});
 
 	it("uses injected principal for protected production routes", async () => {

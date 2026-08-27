@@ -4,12 +4,9 @@
 	"private": true,
 	"type": "module",
 	"exports": {
-		".": "./src/index.ts",
-		"./reusable-schemas": "./src/generated/reusable-schemas.ts"
+		".": "./src/index.ts"
 	},
 	"scripts": {
-		"generate": "tsx scripts/generate-schema-registry.ts && npx --no-install prettier src/generated --write",
-		"test": "node --import tsx --test scripts/generate-schema-registry.test.ts",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {

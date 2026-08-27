@@ -154,6 +154,35 @@
 					}
 				}
 			},
+			"ProjectIdResponse": {
+				"type": "object",
+				"required": ["id"],
+				"properties": {
+					"id": {
+						"type": "string"
+					}
+				}
+			},
+			"ProjectListItem": {
+				"type": "object",
+				"required": ["id", "name", "createdAt", "updatedAt"],
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					}
+				}
+			},
 			"Project": {
 				"type": "object",
 				"required": ["id", "name", "createdAt", "updatedAt", "titleGeneratedAt"],
@@ -182,35 +211,6 @@
 								"type": "null"
 							}
 						]
-					}
-				}
-			},
-			"ProjectIdResponse": {
-				"type": "object",
-				"required": ["id"],
-				"properties": {
-					"id": {
-						"type": "string"
-					}
-				}
-			},
-			"ProjectListItem": {
-				"type": "object",
-				"required": ["id", "name", "createdAt", "updatedAt"],
-				"properties": {
-					"id": {
-						"type": "string"
-					},
-					"name": {
-						"type": "string"
-					},
-					"createdAt": {
-						"type": "string",
-						"format": "date-time"
-					},
-					"updatedAt": {
-						"type": "string",
-						"format": "date-time"
 					}
 				}
 			},
