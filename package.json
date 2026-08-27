@@ -39,7 +39,7 @@
 		"@redocly/cli": "^2.49.0",
 		"concurrently": "^10.0.4",
 		"dotenv": "^17.2.3",
-		"kubb": "5.0.0",
+		"kubb": "5.0.0-beta.110",
 		"prettier": "3.9.6",
 		"prettier-plugin-one-line-imports": "^1.0.3",
 		"prisma": "^6.10.1"
