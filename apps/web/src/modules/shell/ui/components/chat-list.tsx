@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, } from "@/components/ui/sidebar";
-import { projectQueries } from "@/api/queries";
+import { listProjectsQueryOptions } from "@lambda/api-client/query";
 import { groupChatsByRecency } from "@/modules/shell/lib/group-chats";
 import { ChatListItem } from "./chat-list-item";
 
@@ -33,7 +33,8 @@ const subscribeToDayRollover = (onChange: () => void): (() => void) => {
  * @returns {JSX.Element} The rendered chat list.
  */
 export const ChatList = () => {
-	const { data: chats } = useSuspenseQuery(projectQueries.list());
+	const { data: projectsResponse } = useSuspenseQuery(listProjectsQueryOptions());
+	const chats = projectsResponse;
 
 	// The server's day and the viewer's day can differ by timezone; useSyncExternalStore
 	// re-renders with the client's value after hydration rather than mismatching.

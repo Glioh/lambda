@@ -4,8 +4,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, } from "@/components/ui/alert-dialog";
-import { api } from "@/api/browser";
-import { queryKeys } from "@/api/query-keys";
+import { deleteProjectMutationOptions, getProjectQueryKey, listProjectsQueryKey, } from "@lambda/api-client/query";
+import { listMessagesQueryKey } from "@lambda/api-client/query";
+import { getRequestErrorDetails } from "@/lib/request-error";
 
 interface Props {
 	open: boolean;
@@ -27,15 +28,15 @@ export const DeleteChatDialog = ({ open, onOpenChange, chatId, chatName, isActiv
 	const router = useRouter();
 
 	const remove = useMutation({
-		mutationFn: () => api.projects.remove(chatId),
+		...deleteProjectMutationOptions(),
 		onSuccess: ({ id }) => {
 			// Drop the chat's cache outright — nothing can render it now, and
 			// leaving it would resurrect the chat in the list on a refocus refetch.
 			queryClient.removeQueries({
-				queryKey: queryKeys.messages(id),
+				queryKey: listMessagesQueryKey({ path: { projectId: id } }),
 			});
 			queryClient.removeQueries({
-				queryKey: queryKeys.project(id),
+				queryKey: getProjectQueryKey({ path: { projectId: id } }),
 			});
 
 			if (isActive) {
@@ -45,9 +46,9 @@ export const DeleteChatDialog = ({ open, onOpenChange, chatId, chatName, isActiv
 			// Same ordering as rename: the delete already succeeded, so close
 			// immediately rather than waiting on the list refetch.
 			onOpenChange(false);
-			queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+			void queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() });
 		},
-		onError: error => toast.error(error.message),
+		onError: error => toast.error(getRequestErrorDetails(error).message),
 	});
 
 	return (
@@ -68,7 +69,7 @@ export const DeleteChatDialog = ({ open, onOpenChange, chatId, chatName, isActiv
 							// Keep the dialog open until the mutation settles, so a failure
 							// surfaces against the thing it failed on.
 							event.preventDefault();
-							remove.mutate();
+							remove.mutate({ path: { projectId: chatId } });
 						}}
 						className="bg-destructive text-white hover:bg-destructive/90"
 					>

@@ -1,8 +1,9 @@
+"use client";
+
 import { streamChatCompletion } from "@/lib/chat-stream";
-import { ApiError, type Message } from "@/api/client";
-import { api } from "@/api/browser";
-import { queryKeys } from "@/api/query-keys";
-import { messageQueries, projectQueries } from "@/api/queries";
+import type { Message } from "@lambda/api-client/types";
+import { editAndResendMessageMutationOptions, generateProjectTitleMutationOptions, getProjectQueryKey, getProjectQueryOptions, getUsageQueryKey, listMessagesQueryKey, listMessagesQueryOptions, listProjectsQueryKey, retryMessageMutationOptions, } from "@lambda/api-client/query";
+import { getRequestErrorDetails } from "@/lib/request-error";
 import { useSuspenseQuery, useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { MessageCard } from "./message-card";
@@ -47,11 +48,12 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	/** Id of the user message currently open in the inline editor, if any. */
 	const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
-	const { data: messages } = useSuspenseQuery({
-		...messageQueries.list(projectId),
+	const { data: messagesResponse } = useSuspenseQuery({
+		...listMessagesQueryOptions({ path: { projectId } }),
 		refetchInterval: streamingMessage ? STREAMING_POLL_MS : false,
 		staleTime: 5_000,
 	});
+	const messages = messagesResponse;
 
 	const lastMessage = messages[messages.length - 1];
 	const isLastMessageUser = lastMessage?.role === "USER";
@@ -115,11 +117,10 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	);
 
 	// Cache hit — ChatHeader already fetched this project for the title bar.
-	const { data: project } = useQuery(projectQueries.detail(projectId));
+	const { data: projectResponse } = useQuery(getProjectQueryOptions({ path: { projectId } }));
+	const project = projectResponse;
 
-	const generateTitle = useMutation({
-		mutationFn: () => api.projects.generateTitle(projectId),
-	});
+	const generateTitle = useMutation(generateProjectTitleMutationOptions());
 
 	/**
 	 * Names the chat once it has an answer worth naming. The server is the real
@@ -131,32 +132,29 @@ export const MessagesContainer = ({ projectId }: Props) => {
 			return;
 		}
 
-		generateTitle.mutate(undefined, {
-			onSuccess: result => {
-				if (!result) {
-					return;
-				}
+		generateTitle.mutate(
+			{ path: { projectId } },
+			{
+				onSuccess: result => {
+					if (!result) {
+						return;
+					}
 
-				// The sidebar lives above this view in the layout and shares the
-				// same QueryClient, so invalidating is all it takes to retitle it.
-				queryClient.invalidateQueries({
-					queryKey: queryKeys.project(projectId),
-				});
-				queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+					// The sidebar lives above this view in the layout and shares the
+					// same QueryClient, so invalidating is all it takes to retitle it.
+					void queryClient.invalidateQueries({
+						queryKey: getProjectQueryKey({ path: { projectId } }),
+					});
+					void queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() });
+				},
+				// Titling is cosmetic: a failure must never surface as an error toast.
+				onError: () => undefined,
 			},
-			// Titling is cosmetic: a failure must never surface as an error toast.
-			onError: () => undefined,
-		});
+		);
 	}, [project?.titleGeneratedAt, generateTitle, projectId, queryClient]);
 
-	const retryFrom = useMutation({
-		mutationFn: ({ messageId }: { messageId: string }) =>
-			api.messages.retryFrom(projectId, messageId),
-	});
-	const editAndResend = useMutation({
-		mutationFn: ({ messageId, value }: { messageId: string; value: string }) =>
-			api.messages.editAndResend(projectId, messageId, { value }),
-	});
+	const retryFrom = useMutation(retryMessageMutationOptions());
+	const editAndResend = useMutation(editAndResendMessageMutationOptions());
 
 	/**
 	 * Shared tail of every rollback (retry and edit alike).
@@ -173,17 +171,18 @@ export const MessagesContainer = ({ projectId }: Props) => {
 		hasInitializedStreamRef.current = false;
 
 		await queryClient.invalidateQueries({
-			queryKey: queryKeys.messages(projectId),
+			queryKey: listMessagesQueryKey({ path: { projectId } }),
 		});
-		queryClient.invalidateQueries({ queryKey: queryKeys.usage });
+		void queryClient.invalidateQueries({ queryKey: getUsageQueryKey() });
 	}, [projectId, queryClient]);
 
 	/** Surfaces a rollback failure, routing to pricing when out of credits. */
 	const onRollbackError = useCallback(
-		(error: { message: string; code?: string }) => {
-			toast.error(error.message);
+		(error: unknown) => {
+			const details = getRequestErrorDetails(error);
+			toast.error(details.message);
 
-			if (error instanceof ApiError && error.code === "TOO_MANY_REQUESTS") {
+			if (details.status === 429) {
 				router.push("/pricing");
 			}
 		},
@@ -193,9 +192,15 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	/** Rolls the chat back to an answer and re-runs the prompt behind it. */
 	const handleRetry = useCallback(
 		(messageId: string) => {
-			retryFrom.mutate({ messageId }, { onSuccess: afterRollback, onError: onRollbackError });
+			retryFrom.mutate(
+				{ path: { projectId, messageId } },
+				{
+					onSuccess: afterRollback,
+					onError: onRollbackError,
+				},
+			);
 		},
-		[retryFrom, afterRollback, onRollbackError],
+		[retryFrom, afterRollback, onRollbackError, projectId],
 	);
 
 	// One in-flight rollback at a time: both mutations truncate the chat, so
@@ -206,11 +211,11 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	const handleSubmitEdit = useCallback(
 		(messageId: string, value: string) => {
 			editAndResend.mutate(
-				{ messageId, value },
+				{ path: { projectId, messageId }, body: { value } },
 				{ onSuccess: afterRollback, onError: onRollbackError },
 			);
 		},
-		[editAndResend, afterRollback, onRollbackError],
+		[editAndResend, afterRollback, onRollbackError, projectId],
 	);
 
 	// Start streaming response if last message is from user and we aren't already streaming a response
@@ -278,14 +283,14 @@ export const MessagesContainer = ({ projectId }: Props) => {
 						// re-renders a chat that still ends on the user's message.
 						handleStopped();
 						await queryClient.invalidateQueries({
-							queryKey: queryKeys.messages(projectId),
+							queryKey: listMessagesQueryKey({ path: { projectId } }),
 						});
 						maybeGenerateTitle();
 						return;
 					}
 
 					await queryClient.invalidateQueries({
-						queryKey: queryKeys.messages(projectId),
+						queryKey: listMessagesQueryKey({ path: { projectId } }),
 					});
 
 					setStreamingMessage(null);

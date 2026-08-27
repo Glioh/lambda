@@ -27,17 +27,6 @@ Rules:
 - Output only the summary. No preamble, no commentary, no code fences.
 `;
 
-export const TITLE_PROMPT = `
-You generate short titles for chats.
-
-Given the opening exchange, write a title of 3 to 6 words that names the topic.
-
-Rules:
-- Use sentence case.
-- Output the title and nothing else: no quotation marks, no trailing punctuation, no markdown, no preamble.
-- Describe the subject, not the format. "Debugging a useEffect loop", not "A question about React".
-`;
-
 export const CHAT_PROMPT = `
 You are Lambda, a helpful chat assistant.
 Answer questions about UI, React, Next.js, and general coding topics.

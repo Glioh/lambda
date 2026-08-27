@@ -12,8 +12,8 @@ requires one.
 
 tRPC is intentionally removed from Lambda's target architecture. Client type
 safety comes from explicit API request/response schemas and contracts rather than
-`AppRouter` inference. TanStack Query remains the web query and cache layer, used
-over a typed HTTP client.
+router inference. TanStack Query remains the web query and cache layer, used over
+a typed HTTP client.
 
 The target flow is:
 
@@ -41,7 +41,8 @@ avoids moving tRPC into Fastify only to remove it later.
 
 ## Consequences
 
-- The web client keeps TanStack Query but uses a small typed HTTP API client.
+- The web client keeps TanStack Query and consumes Kubb-generated Fetch
+  clients and query factories from the Fastify-generated OpenAPI document.
 - Normal API contracts use explicit schemas for params, query, bodies, successful
   responses, and useful expected errors.
 - Timestamps such as `createdAt` and `updatedAt` are serialized as ISO-8601
@@ -51,8 +52,17 @@ avoids moving tRPC into Fastify only to remove it later.
 - Route schemas remain the source of truth and should be suitable for future
   OpenAPI generation; a separately maintained hand-written OpenAPI file is not
   required.
+- When integration fails because a dependency is too old, update it to a
+  compatible supported version rather than adding a compatibility shim.
 - Unauthorized resource access may remain an indistinguishable 404 where needed
   to prevent resource-existence disclosure.
+- `npm run generate:api` is the single contract-to-client generation command;
+  generated OpenAPI and client files are committed and CI checks for drift.
+- Shared schemas represent meaningful reusable API concepts, not every structural
+  composition. Give `$id`s to reusable DTOs and contracts such as `Project`,
+  `ProjectListItem`, `Message`, and `ErrorResponse`; inline trivial operation
+  composition such as `Type.Array(schemaRef(ProjectListItemSchema))` and simple
+  nullable unions. Do not create `FooListResponseSchema` merely to name `Foo[]`.
 
 ## Relationship to earlier ADRs
 

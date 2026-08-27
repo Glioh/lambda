@@ -10,9 +10,8 @@ import TextareaAutosize from "react-textarea-autosize";
 import { ArrowUpIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ApiError } from "@/api/client";
-import { api } from "@/api/browser";
-import { queryKeys } from "@/api/query-keys";
+import { createProjectMutationOptions, getUsageQueryKey, listProjectsQueryKey, } from "@lambda/api-client/query";
+import { getRequestErrorDetails } from "@/lib/request-error";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useAttachments } from "@/modules/attachments/hooks/use-attachments";
@@ -50,17 +49,17 @@ export const ProjectForm = () => {
 	const watchedValue = useWatch({ control: form.control, name: "value" });
 
 	const createProject = useMutation({
-		mutationFn: (input: { value: string; attachments?: ReturnType<typeof attachmentsToInput> }) =>
-			api.projects.create(input),
+		...createProjectMutationOptions(),
 		onSuccess: data => {
-			queryClient.invalidateQueries({ queryKey: queryKeys.projects });
-			queryClient.invalidateQueries({ queryKey: queryKeys.usage });
+			void queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: getUsageQueryKey() });
 			router.push(`/projects/${data.id}`);
 		},
 		onError: error => {
-			toast.error(error.message);
-			if (error instanceof ApiError && error.code === "UNAUTHORIZED") router.push("/sign-in");
-			if (error instanceof ApiError && error.code === "TOO_MANY_REQUESTS") router.push("/pricing");
+			const details = getRequestErrorDetails(error);
+			toast.error(details.message);
+			if (details.status === 401) router.push("/sign-in");
+			if (details.status === 429) router.push("/pricing");
 		},
 	});
 
@@ -68,8 +67,10 @@ export const ProjectForm = () => {
 		const pendingAttachments = attachmentsToInput();
 
 		createProject.mutate({
-			value: values.value,
-			...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
+			body: {
+				value: values.value,
+				...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
+			},
 		});
 	};
 

@@ -1,4 +1,6 @@
-import type { MessageType } from "@prisma/client";
+import type { Message } from "@lambda/api-contracts";
+
+type MessageType = Message["type"];
 
 /** `createdAt` filter that selects the rows a chat rollback discards. */
 export interface RollbackScope {
@@ -25,13 +27,8 @@ export interface RollbackScope {
  *   re-running a user turn preserves the prompt).
  * @returns {RollbackScope} The rows to delete.
  */
-export function rollbackScope(
-	boundary: Date,
-	edge: "from" | "after",
-): RollbackScope {
-	return edge === "from"
-		? { createdAt: { gte: boundary } }
-		: { createdAt: { gt: boundary } };
+export function rollbackScope(boundary: Date, edge: "from" | "after"): RollbackScope {
+	return edge === "from" ? { createdAt: { gte: boundary } } : { createdAt: { gt: boundary } };
 }
 
 /** Message boundary and descendants selected for rollback. */
@@ -61,7 +58,7 @@ export function survivingMessages<T extends RollbackCandidate>(
 	messages: T[],
 	scope: RollbackScope,
 ): T[] {
-	return messages.filter((message) =>
+	return messages.filter(message =>
 		"gt" in scope.createdAt
 			? message.createdAt.getTime() <= scope.createdAt.gt.getTime()
 			: message.createdAt.getTime() < scope.createdAt.gte.getTime(),

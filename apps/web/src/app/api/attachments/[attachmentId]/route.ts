@@ -1,12 +1,12 @@
 import { prisma } from "@/lib/db";
-import { resolveUserId } from "@/lib/dev-auth";
+import { auth } from "@clerk/nextjs/server";
 
 /**
  * Serves an attachment's bytes.
  *
- * This exists so image payloads never travel through tRPC: `messages.getMany`
+ * This exists so image payloads never travel through message HTTP responses:
  * is re-fetched on a poll while a response streams, and putting megabytes of
- * base64 in that response would be re-serialized through superjson every time.
+ * base64 in that response would be re-serialized on every poll.
  * Serving them here also gets HTTP caching for free.
  *
  * @param {Request} _request - Unused; the id comes from the route segment.
@@ -17,7 +17,7 @@ export async function GET(
 	_request: Request,
 	{ params }: { params: Promise<{ attachmentId: string }> },
 ) {
-	const userId = await resolveUserId();
+	const { userId } = await auth();
 
 	if (!userId) {
 		return new Response("Not authenticated", { status: 401 });

@@ -4,8 +4,9 @@ import { auth } from "@clerk/nextjs/server";
 import { AppShell } from "@/modules/shell/ui/components/app-shell";
 import { MarketingChrome } from "@/modules/shell/ui/components/marketing-chrome";
 import { makeQueryClient } from "@/lib/query-client";
-import { queryKeys, type ProjectListItem } from "@/api/client";
-import { serverApiRequest } from "@/api/server-client";
+import { listProjectsQueryOptions } from "@lambda/api-client/query";
+import { createServerApiClient } from "@/lib/api/server-client";
+import { QueryProvider } from "./query-provider";
 
 /** The cookie SidebarProvider persists its open/closed state to. */
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -32,16 +33,20 @@ const Layout = async ({ children }: Props) => {
 	// SidebarProvider writes this cookie but nothing read it until now; reading
 	// it server-side is what stops the sidebar flashing open then collapsing.
 	const defaultOpen = cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false";
+	const apiClient = await createServerApiClient();
 
-	await queryClient.prefetchQuery({
-		queryKey: queryKeys.projects,
-		queryFn: () => serverApiRequest<ProjectListItem[]>("/api/projects"),
-	});
+	try {
+		await queryClient.prefetchQuery(listProjectsQueryOptions({ client: apiClient }));
+	} catch {
+		// A temporary server/API failure shouldn't necessarily kill SSR; let the browser try the request again
+	}
 
 	return (
-		<HydrationBoundary state={dehydrate(queryClient)}>
-			<AppShell defaultOpen={defaultOpen}>{children}</AppShell>
-		</HydrationBoundary>
+		<QueryProvider>
+			<HydrationBoundary state={dehydrate(queryClient)}>
+				<AppShell defaultOpen={defaultOpen}>{children}</AppShell>
+			</HydrationBoundary>
+		</QueryProvider>
 	);
 };
 

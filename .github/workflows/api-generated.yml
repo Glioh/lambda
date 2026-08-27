@@ -1,0 +1,17 @@
+name: API generated output
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  generated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check:api-generated

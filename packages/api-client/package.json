@@ -1,0 +1,23 @@
+{
+	"name": "@lambda/api-client",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/generated/client/index.ts",
+		"./client": "./src/client.ts",
+		"./query": "./src/generated/query/index.ts",
+		"./types": "./src/generated/types/index.ts"
+	},
+	"scripts": {
+		"generate": "kubb generate --config ./kubb.config.ts && npx --no-install prettier src/generated --write",
+		"test": "node --experimental-test-module-mocks --import tsx --test src/*.test.ts",
+		"typecheck": "tsc --noEmit"
+	},
+	"dependencies": {
+		"@tanstack/react-query": "5.101.4"
+	},
+	"devDependencies": {
+		"fastify": "5.12.0"
+	}
+}

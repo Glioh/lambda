@@ -1,3 +1,5 @@
+"use client";
+
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import z from "zod";
@@ -9,10 +11,8 @@ import TextareaAutosize from "react-textarea-autosize";
 import { ArrowUpIcon, Loader2Icon, SquareIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ApiError } from "@/api/client";
-import { api } from "@/api/browser";
-import { queryKeys } from "@/api/query-keys";
-import { usageQueries } from "@/api/queries";
+import { createMessageMutationOptions, getUsageQueryKey, getUsageQueryOptions, listMessagesQueryKey, listProjectsQueryKey, } from "@lambda/api-client/query";
+import { getRequestErrorDetails } from "@/lib/request-error";
 import { toast } from "sonner";
 import { Usage } from "./usage";
 import { useRouter } from "next/navigation";
@@ -81,7 +81,8 @@ export const MessageForm = ({
 		onStopRequested?.();
 	}, [onStopRequested]);
 
-	const { data: usage } = useQuery(usageQueries.status());
+	const { data: usageResponse } = useQuery(getUsageQueryOptions());
+	const usage = usageResponse;
 
 	const form = useForm<z.infer<typeof formSchema>>({
 		resolver: zodResolver(formSchema),
@@ -97,13 +98,7 @@ export const MessageForm = ({
 	// the component memoizable instead of opting it out of the compiler.
 	const watchedValue = useWatch({ control: form.control, name: "value" });
 
-	const createMessage = useMutation({
-		mutationFn: (input: {
-			value: string;
-			projectId: string;
-			attachments?: ReturnType<typeof attachmentsToInput>;
-		}) => api.messages.create(input.projectId, input),
-	});
+	const createMessage = useMutation(createMessageMutationOptions());
 
 	/**
 	 * Starts the chat stream and forwards incoming tokens to the parent.
@@ -135,13 +130,13 @@ export const MessageForm = ({
 			if (stopped) {
 				onChatStreamStopped?.();
 				await queryClient.invalidateQueries({
-					queryKey: queryKeys.messages(projectId),
+					queryKey: listMessagesQueryKey({ path: { projectId } }),
 				});
 				return;
 			}
 
 			await queryClient.invalidateQueries({
-				queryKey: queryKeys.messages(projectId),
+				queryKey: listMessagesQueryKey({ path: { projectId } }),
 			});
 
 			onChatStreamEnd?.();
@@ -164,26 +159,28 @@ export const MessageForm = ({
 
 		createMessage.mutate(
 			{
-				value: values.value,
-				projectId,
-				...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
+				path: { projectId },
+				body: {
+					value: values.value,
+					...(pendingAttachments.length > 0 ? { attachments: pendingAttachments } : {}),
+				},
 			},
 			{
 				onSuccess: async message => {
 					form.reset();
 					clearAttachments();
 					// Fire-and-forget for usage — not on critical path
-					queryClient.invalidateQueries({ queryKey: queryKeys.usage });
+					void queryClient.invalidateQueries({ queryKey: getUsageQueryKey() });
 
 					// Don't block stream on message list refresh
 					// The poll interval will pick up the new message
-					queryClient.invalidateQueries({
-						queryKey: queryKeys.messages(projectId),
+					void queryClient.invalidateQueries({
+						queryKey: listMessagesQueryKey({ path: { projectId } }),
 					});
 
 					// Activity bumps Project.updatedAt server-side, so refresh the
 					// sidebar to float this chat back to the top of the list.
-					queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+					void queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() });
 
 					try {
 						await streamChatResponse(message.id);
@@ -196,9 +193,10 @@ export const MessageForm = ({
 					}
 				},
 				onError: error => {
-					toast.error(error.message);
+					const details = getRequestErrorDetails(error);
+					toast.error(details.message);
 
-					if (error instanceof ApiError && error.code === "TOO_MANY_REQUESTS") {
+					if (details.status === 429) {
 						router.push("/pricing");
 					}
 				},

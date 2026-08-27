@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import type { Project } from "@lambda/api-client/types";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useTRPC } from "@/trpc/client";
+import { getProjectQueryKey, listProjectsQueryKey, renameProjectMutationOptions, } from "@lambda/api-client/query";
+import { getRequestErrorDetails } from "@/lib/request-error";
 
 const MAX_NAME_LENGTH = 100;
 
@@ -47,27 +49,24 @@ interface FormProps {
  * @returns {JSX.Element} The rendered rename form.
  */
 const RenameForm = ({ chatId, currentName, onDone }: FormProps) => {
-	const trpc = useTRPC();
 	const queryClient = useQueryClient();
 	const [name, setName] = useState(currentName);
+	const rename = useMutation({
+		...renameProjectMutationOptions(),
+		onSuccess: ({ id, name: newName }) => {
+			queryClient.setQueryData<Project>(
+				getProjectQueryKey({ path: { projectId: id } }),
+				previous => (previous ? { ...previous, name: newName } : previous),
+			);
 
-	const rename = useMutation(
-		trpc.projects.rename.mutationOptions({
-			onSuccess: ({ id, name: newName }) => {
-				queryClient.setQueryData(
-					trpc.projects.getOne.queryKey({ id }),
-					(previous) => (previous ? { ...previous, name: newName } : previous),
-				);
-
-				// Close first, refresh after. The write already succeeded, so gating
-				// the dialog on a refetch would leave it hanging open for no reason —
-				// and the optimistic setQueryData above already shows the new name.
-				onDone();
-				queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-			},
-			onError: (error) => toast.error(error.message),
-		}),
-	);
+			// Close first, refresh after. The write already succeeded, so gating
+			// the dialog on a refetch would leave it hanging open for no reason —
+			// and the optimistic setQueryData above already shows the new name.
+			onDone();
+			void queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() });
+		},
+		onError: error => toast.error(getRequestErrorDetails(error).message),
+	});
 
 	const trimmed = name.trim();
 	const canSubmit = trimmed.length > 0 && trimmed !== currentName && !rename.isPending;
@@ -77,7 +76,7 @@ const RenameForm = ({ chatId, currentName, onDone }: FormProps) => {
 			onSubmit={event => {
 				event.preventDefault();
 				if (canSubmit) {
-					rename.mutate({ id: chatId, name: trimmed });
+					rename.mutate({ path: { projectId: chatId }, body: { name: trimmed } });
 				}
 			}}
 		>

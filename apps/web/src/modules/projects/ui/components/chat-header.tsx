@@ -12,7 +12,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { UserControl } from "@/components/user-control";
 import { DeleteChatDialog } from "@/modules/shell/ui/components/delete-chat-dialog";
 import { RenameChatDialog } from "@/modules/shell/ui/components/rename-chat-dialog";
-import { projectQueries } from "@/api/queries";
+import { getProjectQueryOptions } from "@lambda/api-client/query";
 
 interface Props {
 	projectId: string;
@@ -30,7 +30,10 @@ export const ChatHeader = ({ projectId }: Props) => {
 	const [renameOpen, setRenameOpen] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
 
-	const { data: project } = useSuspenseQuery(projectQueries.detail(projectId));
+	const { data: projectResponse } = useSuspenseQuery(
+		getProjectQueryOptions({ path: { projectId } }),
+	);
+	const project = projectResponse;
 
 	const hasProAccess = isLoaded ? has?.({ plan: "pro" }) : undefined;
 

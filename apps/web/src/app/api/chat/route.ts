@@ -33,9 +33,7 @@ export interface ChatRouteDependencies {
 	completeChat: (input: CompleteChatInput) => Promise<ChatCompletionResult>;
 }
 
-export function createChatPostHandler(
-	overrides: Partial<ChatRouteDependencies> = {},
-) {
+export function createChatPostHandler(overrides: Partial<ChatRouteDependencies> = {}) {
 	const dependencies: ChatRouteDependencies = {
 		auth,
 		completeChat: async (input: CompleteChatInput) =>
@@ -44,8 +42,7 @@ export function createChatPostHandler(
 	};
 
 	return async function POST(request: Request) {
-		const { userId: authUserId } = await dependencies.auth();
-		const userId = authUserId ?? (DEV_NO_AUTH ? DEV_FAKE_USER_ID : null);
+		const { userId } = await dependencies.auth();
 
 		if (!userId) {
 			return Response.json({ error: "Not authenticated" }, { status: 401 });
@@ -78,91 +75,85 @@ export function createChatPostHandler(
 		});
 
 		if (result.kind === "not-found") {
-			return Response.json(
-				{ error: "Project or message not found." },
-				{ status: 404 },
-			);
+			return Response.json({ error: "Project or message not found." }, { status: 404 });
 		}
 
-			let iterator: AsyncIterator<ChatCompletionEvent> | null = null;
-			let cancelled = false;
-			const stream = new ReadableStream<Uint8Array>({
-				start(controller) {
-					iterator = result.events[Symbol.asyncIterator]();
-					const enqueue = (data: Uint8Array): boolean => {
-						if (cancelled || request.signal.aborted) return false;
-						try {
-							controller.enqueue(data);
-							return true;
-						} catch {
-							cancelled = true;
-							return false;
-						}
-					};
-					const close = () => {
-						try {
-							controller.close();
-						} catch {
-							// Consumer already cancelled or stream already closed.
-						}
-					};
-					const pump = async () => {
-						try {
-							while (!cancelled && !request.signal.aborted) {
-								const next = await iterator?.next();
-								if (!next || next.done) {
-									enqueue(encodeData("[DONE]"));
-									close();
-									return;
-								}
-								const event = next.value;
-								switch (event.kind) {
-									case "thinking":
-										enqueue(encodeStatus("thinking"));
-										break;
-									case "compacting":
-										enqueue(encodeStatus("compacting"));
-										break;
-									case "token":
-										enqueue(encodeData({ token: event.token }));
-										break;
-									case "error":
-										enqueue(encodeError(event.message));
-										break;
-									case "done":
-										enqueue(encodeData("[DONE]"));
-										close();
-										return;
-								default:
-									break;
-								}
-						}
-
-						} catch {
-							if (cancelled || request.signal.aborted) {
+		let iterator: AsyncIterator<ChatCompletionEvent> | null = null;
+		let cancelled = false;
+		const stream = new ReadableStream<Uint8Array>({
+			start(controller) {
+				iterator = result.events[Symbol.asyncIterator]();
+				const enqueue = (data: Uint8Array): boolean => {
+					if (cancelled || request.signal.aborted) return false;
+					try {
+						controller.enqueue(data);
+						return true;
+					} catch {
+						cancelled = true;
+						return false;
+					}
+				};
+				const close = () => {
+					try {
+						controller.close();
+					} catch {
+						// Consumer already cancelled or stream already closed.
+					}
+				};
+				const pump = async () => {
+					try {
+						while (!cancelled && !request.signal.aborted) {
+							const next = await iterator?.next();
+							if (!next || next.done) {
+								enqueue(encodeData("[DONE]"));
 								close();
 								return;
 							}
-
-							enqueue(
-								encodeError("Something went wrong. Please try again."),
-							);
-							enqueue(encodeData("[DONE]"));
-							close();
-						} finally {
-							iterator = null;
+							const event = next.value;
+							switch (event.kind) {
+								case "thinking":
+									enqueue(encodeStatus("thinking"));
+									break;
+								case "compacting":
+									enqueue(encodeStatus("compacting"));
+									break;
+								case "token":
+									enqueue(encodeData({ token: event.token }));
+									break;
+								case "error":
+									enqueue(encodeError(event.message));
+									break;
+								case "done":
+									enqueue(encodeData("[DONE]"));
+									close();
+									return;
+								default:
+									break;
+							}
 						}
-					};
+					} catch {
+						if (cancelled || request.signal.aborted) {
+							close();
+							return;
+						}
 
-					void pump();
-				},
-				cancel() {
-					cancelled = true;
-					const activeIterator = iterator;
-					iterator = null;
-					void activeIterator?.return?.().catch(() => undefined);
-				},
-			});
+						enqueue(encodeError("Something went wrong. Please try again."));
+						enqueue(encodeData("[DONE]"));
+						close();
+					} finally {
+						iterator = null;
+					}
+				};
+
+				void pump();
+			},
+			cancel() {
+				cancelled = true;
+				const activeIterator = iterator;
+				iterator = null;
+				void activeIterator?.return?.().catch(() => undefined);
+			},
+		});
 
 		return new Response(stream, {
 			headers: {

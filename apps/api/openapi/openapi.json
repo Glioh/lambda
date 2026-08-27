@@ -1,0 +1,943 @@
+{
+	"openapi": "3.1.0",
+	"info": {
+		"title": "Lambda API",
+		"version": "0.1.0"
+	},
+	"components": {
+		"schemas": {
+			"AttachmentInput": {
+				"type": "object",
+				"required": ["mimeType", "data", "width", "height"],
+				"properties": {
+					"mimeType": {
+						"anyOf": [
+							{
+								"type": "string",
+								"enum": ["image/png"]
+							},
+							{
+								"type": "string",
+								"enum": ["image/jpeg"]
+							},
+							{
+								"type": "string",
+								"enum": ["image/webp"]
+							},
+							{
+								"type": "string",
+								"enum": ["image/gif"]
+							}
+						]
+					},
+					"data": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 5592410
+					},
+					"width": {
+						"type": "integer",
+						"minimum": 1
+					},
+					"height": {
+						"type": "integer",
+						"minimum": 1
+					}
+				}
+			},
+			"AttachmentResponse": {
+				"type": "object",
+				"required": ["id", "mimeType", "width", "height"],
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"mimeType": {
+						"type": "string"
+					},
+					"width": {
+						"type": "integer"
+					},
+					"height": {
+						"type": "integer"
+					}
+				}
+			},
+			"ErrorResponse": {
+				"type": "object",
+				"required": ["statusCode", "error", "message"],
+				"properties": {
+					"statusCode": {
+						"type": "number"
+					},
+					"code": {
+						"type": "string"
+					},
+					"error": {
+						"type": "string"
+					},
+					"message": {
+						"type": "string"
+					}
+				}
+			},
+			"GenerateTitleResponse": {
+				"anyOf": [
+					{
+						"type": "object",
+						"required": ["id", "name"],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"MessageListResponse": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/Message"
+				}
+			},
+			"Message": {
+				"type": "object",
+				"required": ["id", "content", "role", "type", "createdAt", "updatedAt", "attachments"],
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"content": {
+						"type": "string"
+					},
+					"role": {
+						"anyOf": [
+							{
+								"type": "string",
+								"enum": ["USER"]
+							},
+							{
+								"type": "string",
+								"enum": ["ASSISTANT"]
+							}
+						]
+					},
+					"type": {
+						"anyOf": [
+							{
+								"type": "string",
+								"enum": ["RESULT"]
+							},
+							{
+								"type": "string",
+								"enum": ["ERROR"]
+							},
+							{
+								"type": "string",
+								"enum": ["SUMMARY"]
+							}
+						]
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"attachments": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/AttachmentResponse"
+						}
+					}
+				}
+			},
+			"ProjectIdResponse": {
+				"type": "object",
+				"required": ["id"],
+				"properties": {
+					"id": {
+						"type": "string"
+					}
+				}
+			},
+			"ProjectListItem": {
+				"type": "object",
+				"required": ["id", "name", "createdAt", "updatedAt"],
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					}
+				}
+			},
+			"ProjectListResponse": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/ProjectListItem"
+				}
+			},
+			"Project": {
+				"type": "object",
+				"required": ["id", "name", "createdAt", "updatedAt", "titleGeneratedAt"],
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"createdAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"updatedAt": {
+						"type": "string",
+						"format": "date-time"
+					},
+					"titleGeneratedAt": {
+						"anyOf": [
+							{
+								"type": "string",
+								"format": "date-time"
+							},
+							{
+								"type": "null"
+							}
+						]
+					}
+				}
+			},
+			"RenameProjectResponse": {
+				"type": "object",
+				"required": ["id", "name"],
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					}
+				}
+			},
+			"RollbackResponse": {
+				"type": "object",
+				"required": ["value", "hasAttachments"],
+				"properties": {
+					"value": {
+						"type": "string"
+					},
+					"hasAttachments": {
+						"type": "boolean"
+					}
+				}
+			},
+			"Usage": {
+				"type": "object",
+				"required": ["remainingPoints", "msBeforeNext"],
+				"properties": {
+					"remainingPoints": {
+						"type": "number"
+					},
+					"msBeforeNext": {
+						"type": "number"
+					}
+				}
+			}
+		}
+	},
+	"paths": {
+		"/api/projects": {
+			"get": {
+				"operationId": "listProjects",
+				"tags": ["projects"],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ProjectListResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "createProject",
+				"tags": ["projects"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": ["value"],
+								"properties": {
+									"value": {
+										"type": "string",
+										"maxLength": 10000
+									},
+									"attachments": {
+										"type": "array",
+										"items": {
+											"$ref": "#/components/schemas/AttachmentInput"
+										},
+										"maxItems": 4
+									}
+								}
+							}
+						}
+					}
+				},
+				"responses": {
+					"201": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Project"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/projects/{projectId}": {
+			"get": {
+				"operationId": "getProject",
+				"tags": ["projects"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Project"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			},
+			"patch": {
+				"operationId": "renameProject",
+				"tags": ["projects"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": ["name"],
+								"properties": {
+									"name": {
+										"type": "string"
+									}
+								}
+							}
+						}
+					}
+				},
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RenameProjectResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			},
+			"delete": {
+				"operationId": "deleteProject",
+				"tags": ["projects"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ProjectIdResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/projects/{projectId}/generate-title": {
+			"post": {
+				"operationId": "generateProjectTitle",
+				"tags": ["projects"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/GenerateTitleResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/projects/{projectId}/messages": {
+			"get": {
+				"operationId": "listMessages",
+				"tags": ["messages"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/MessageListResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			},
+			"post": {
+				"operationId": "createMessage",
+				"tags": ["messages"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": ["value"],
+								"properties": {
+									"value": {
+										"type": "string",
+										"maxLength": 10000
+									},
+									"attachments": {
+										"type": "array",
+										"items": {
+											"$ref": "#/components/schemas/AttachmentInput"
+										},
+										"maxItems": 4
+									}
+								}
+							}
+						}
+					}
+				},
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					}
+				],
+				"responses": {
+					"201": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/Message"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"413": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/projects/{projectId}/messages/{messageId}/edit-and-resend": {
+			"post": {
+				"operationId": "editAndResendMessage",
+				"tags": ["messages"],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"type": "object",
+								"required": ["value"],
+								"properties": {
+									"value": {
+										"type": "string",
+										"maxLength": 10000
+									}
+								}
+							}
+						}
+					}
+				},
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					},
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "messageId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RollbackResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/projects/{projectId}/messages/{messageId}/retry": {
+			"post": {
+				"operationId": "retryMessage",
+				"tags": ["messages"],
+				"parameters": [
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "projectId",
+						"required": true
+					},
+					{
+						"schema": {
+							"type": "string",
+							"minLength": 1
+						},
+						"in": "path",
+						"name": "messageId",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/RollbackResponse"
+								}
+							}
+						}
+					},
+					"400": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"429": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/api/usage": {
+			"get": {
+				"operationId": "getUsage",
+				"tags": ["usage"],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"anyOf": [
+										{
+											"$ref": "#/components/schemas/Usage"
+										},
+										{
+											"type": "null"
+										}
+									]
+								}
+							}
+						}
+					},
+					"401": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
