@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import type { FastifyInstance } from "fastify";
+import { reusableSchemas } from "@lambda/api-contracts/reusable-schemas";
 import { buildApp } from "../app.js";
 import type { ApiRouteDependencies } from "../http/routes/index.js";
 import { DEFAULT_HOST, DEFAULT_PORT, getServerConfig } from "../config.js";
@@ -55,20 +56,28 @@ describe("API application", () => {
 		assert.equal(document.paths?.["/api/health"], undefined);
 		assert.equal(document.paths?.["/api/openapi.json"], undefined);
 		const schemaNames = Object.keys(document.components?.schemas ?? {});
-		for (const schemaName of [
-			"AttachmentResponse",
-			"ErrorResponse",
-			"Message",
-			"Project",
-			"ProjectListItem",
-			"Usage",
-		]) {
-			assert.ok(schemaNames.includes(schemaName), `missing schema ${schemaName}`);
+		const registeredSchemas = app.getSchemas() as Record<string, { $id?: string }>;
+		for (const schema of reusableSchemas) {
+			const id = (schema as { $id?: string }).$id;
+			assert.equal(typeof id, "string");
+			if (typeof id !== "string") continue;
+			assert.deepEqual(registeredSchemas[id], schema);
+			assert.ok(schemaNames.includes(id));
 		}
 		assert.equal(
 			schemaNames.some(name => /^(?:def-?\d+)$/i.test(name)),
 			false,
 		);
+		const projectGet = document.paths?.["/api/projects/{projectId}"] as {
+			get?: {
+				responses?: {
+					401?: { content?: { "application/json"?: { schema?: unknown } } };
+				};
+			};
+		};
+		assert.deepEqual(projectGet.get?.responses?.[401]?.content?.["application/json"]?.schema, {
+			$ref: "#/components/schemas/ErrorResponse",
+		});
 		const operationIds = {
 			"GET /api/projects": "listProjects",
 			"GET /api/projects/{projectId}": "getProject",

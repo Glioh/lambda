@@ -1,6 +1,10 @@
 import { spawnSync } from "node:child_process";
 
-const generatedPaths = ["apps/api/openapi", "packages/api-client/src/generated"];
+const generatedPaths = [
+	"apps/api/openapi",
+	"packages/api-contracts/src/generated",
+	"packages/api-client/src/generated",
+];
 const diff = spawnSync("git", ["diff", "--exit-code", "--", ...generatedPaths], {
 	encoding: "utf8",
 });
