@@ -43,15 +43,20 @@ avoids moving tRPC into Fastify only to remove it later.
 
 - The web client keeps TanStack Query and consumes Kubb-generated Fetch
   clients and query factories from the Fastify-generated OpenAPI document.
-- Normal API contracts use explicit schemas for params, query, bodies, successful
-  responses, and useful expected errors.
+- API contracts are authored as TypeBox schemas under
+  `apps/api/src/contracts` and are used by Fastify for params, query, bodies,
+  successful responses, and useful expected errors.
+- `apps/api/openapi.json` is generated from the registered Fastify routes,
+  validated by Redocly, and consumed by Kubb to generate
+  `packages/api-client/src/generated`.
+- Generated OpenAPI and client output are committed; CI checks that generation
+  produces no diff.
 - Timestamps such as `createdAt` and `updatedAt` are serialized as ISO-8601
   strings over HTTP.
 - A consistent error envelope is preferred, for example
-  `{ "error": { "code": "NOT_FOUND", "message": "Project not found." } }`.
-- Route schemas remain the source of truth and should be suitable for future
-  OpenAPI generation; a separately maintained hand-written OpenAPI file is not
-  required.
+  `{ "statusCode": 404, "code": "NOT_FOUND", "error": "Not Found", "message": "Project not found." }`.
+- OpenAPI is a generated, language-independent consumer boundary. There is no
+  separately maintained contract package or hand-written OpenAPI file.
 - When integration fails because a dependency is too old, update it to a
   compatible supported version rather than adding a compatibility shim.
 - Unauthorized resource access may remain an indistinguishable 404 where needed
