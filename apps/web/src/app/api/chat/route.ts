@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import type { ChatCompletionEvent, ChatCompletionResult, CompleteChatInput, } from "@/modules/chats/server/completion";
+import { auth } from "@clerk/nextjs/server";
 import z from "zod";
 
 export const runtime = "nodejs";

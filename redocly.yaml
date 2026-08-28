@@ -1,6 +1,6 @@
 apis:
   lambda:
-    root: apps/api/openapi/openapi.json
+    root: apps/api/openapi.json
 
 extends:
   - spec

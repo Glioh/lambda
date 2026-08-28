@@ -1,4 +1,5 @@
-import { Type, type Static, type TSchema } from "typebox";
+import type { Static, TSchema } from "typebox";
+import { Type } from "typebox";
 
 /**
  * Creates a schema reference for a given TypeBox schema for use in other schemas.

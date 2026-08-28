@@ -1,6 +1,6 @@
-import { getAuth } from "@clerk/fastify";
-import type { FastifyRequest } from "fastify";
 import type { AuthPrincipal, PrincipalResolver } from "./auth-principal.js";
+import type { FastifyRequest } from "fastify";
+import { getAuth } from "@clerk/fastify";
 
 declare module "fastify" {
 	interface FastifyRequest {

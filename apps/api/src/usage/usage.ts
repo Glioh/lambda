@@ -1,5 +1,5 @@
-import { getAuth } from "@clerk/fastify";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { getAuth } from "@clerk/fastify";
 import { RateLimiterPrisma } from "rate-limiter-flexible";
 import { prisma } from "../db.js";
 

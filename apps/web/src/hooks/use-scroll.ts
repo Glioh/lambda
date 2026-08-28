@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 /** Reports whether document has scrolled beyond supplied pixel threshold. */
 export const useScroll = (threshold = 10) => {

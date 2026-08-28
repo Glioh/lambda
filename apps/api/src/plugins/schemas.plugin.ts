@@ -1,5 +1,6 @@
+import type { TSchema } from "typebox";
 import fp from "fastify-plugin";
-import { IsKind, IsSchema, type TSchema } from "typebox";
+import { IsKind, IsSchema } from "typebox";
 import * as contracts from "../contracts/index.js";
 
 type TypeBoxSchema = TSchema & { $id?: unknown; "~kind"?: unknown };

@@ -1,9 +1,11 @@
 "use client";
 
+import type { AttachmentInput } from "../constants";
+import type { PreparedImage } from "../lib/prepare-image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_TOTAL_ATTACHMENT_BYTES, type AttachmentInput, } from "../constants";
-import { prepareImage, type PreparedImage } from "../lib/prepare-image";
+import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_TOTAL_ATTACHMENT_BYTES } from "../constants";
+import { prepareImage } from "../lib/prepare-image";
 
 /** Attachment selection state and actions exposed to message composers. */
 export interface UseAttachments {

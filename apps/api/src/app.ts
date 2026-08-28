@@ -1,10 +1,12 @@
-import Fastify, { type FastifyInstance, type FastifyServerOptions } from "fastify";
-import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
-import { assertClerkConfigured } from "./auth/clerk-auth.js";
 import type { PrincipalResolver } from "./auth/auth-principal.js";
-import { defaultRouteDependencies, type ApiRouteDependencies } from "./http/routes/dependencies.js";
+import type { ApiRouteDependencies } from "./http/routes/dependencies.js";
+import type { FastifyInstance, FastifyServerOptions } from "fastify";
+import { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
+import Fastify from "fastify";
+import { assertClerkConfigured } from "./auth/clerk-auth.js";
 import { protectedApiPlugin } from "./http/protected-api.plugin.js";
 import { publicApiPlugin } from "./http/public-api.plugin.js";
+import { defaultRouteDependencies } from "./http/routes/dependencies.js";
 import { errorHandlerPlugin } from "./plugins/error-handler.plugin.js";
 import { openApiPlugin } from "./plugins/openapi.plugin.js";
 import { schemasPlugin } from "./plugins/schemas.plugin.js";

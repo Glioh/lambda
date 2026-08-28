@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+
 //this sets up the prisma client
 //since nextjs hot reloads we need to make sure we only have one instance of the prisma client
 //^^ tf why does intellesense complete my sentences now

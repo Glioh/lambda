@@ -1,7 +1,7 @@
 import "server-only";
 
-import { headers } from "next/headers";
 import { createApiClient } from "@lambda/api-client/client";
+import { headers } from "next/headers";
 
 const apiUrl = () =>
 	(process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(

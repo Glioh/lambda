@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { buildApp } from "../apps/api/src/app.js";
 
-const outputPath = resolve("apps/api/openapi/openapi.json");
+const outputPath = resolve("apps/api/openapi.json");
 
 const main = async () => {
 	const app = buildApp({

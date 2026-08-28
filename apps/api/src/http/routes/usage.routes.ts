@@ -1,7 +1,8 @@
+import type { ApiRouteDependencies } from "./dependencies.js";
+import type { ApiFastifyInstance } from "./types.js";
 import { getAuthPrincipal } from "../../auth/clerk-auth.js";
 import { schemaRef, UsageSchema } from "../../contracts/index.js";
-import { defaultRouteDependencies, type ApiRouteDependencies } from "./dependencies.js";
-import type { ApiFastifyInstance } from "./types.js";
+import { defaultRouteDependencies } from "./dependencies.js";
 
 export function registerUsageRoutes(
 	app: ApiFastifyInstance,

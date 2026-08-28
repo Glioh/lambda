@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import type { Static } from "typebox";
+import { Type } from "typebox";
 
 export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
 export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;

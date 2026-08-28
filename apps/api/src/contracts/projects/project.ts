@@ -1,4 +1,5 @@
-import { Type, type Static } from "typebox";
+import type { Static } from "typebox";
+import { Type } from "typebox";
 import { DateTimeSchema } from "../common/datetime.js";
 
 export const ProjectListItemSchema = Type.Object(

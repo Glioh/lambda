@@ -9,6 +9,15 @@ Before editing files for a substantial task:
 - Multiple matches: prefer the most specific local skill for the package or concern you are changing; load additional skills only when the task spans multiple packages or concerns.
 <!-- intent-skills:end -->
 
+## Test ownership
+
+- Production code belongs in each workspace's `src/`.
+- Tests belong in that workspace's `test/`.
+- Do not create `__tests__` directories or place `*.test.ts` or `*.test.tsx` under `src/`.
+- Organize tests primarily by feature/source ownership; create separate categories only when execution or infrastructure differs.
+- Root `test/` is reserved for true cross-workspace E2E/system tests.
+- Test scripts should use discovery instead of explicit test-file inventories.
+
 # Code formatting
 
 Prettier is the authoritative formatter for this repository.

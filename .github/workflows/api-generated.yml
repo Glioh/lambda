@@ -20,7 +20,7 @@ jobs:
       - name: Verify generated API output is committed
         run: |
           changes="$(git status --porcelain -- \
-            apps/api/openapi \
+            apps/api/openapi.json \
             packages/api-client/src/generated)"
 
           if [ -n "$changes" ]; then
@@ -30,11 +30,11 @@ jobs:
             echo
             echo "Generated diff:"
             git diff -- \
-              apps/api/openapi \
+              apps/api/openapi.json \
               packages/api-client/src/generated
 
             untracked="$(git ls-files --others --exclude-standard -- \
-              apps/api/openapi \
+              apps/api/openapi.json \
               packages/api-client/src/generated)"
             if [ -n "$untracked" ]; then
               echo

@@ -1,6 +1,7 @@
-import { Type, type Static } from "typebox";
-import { DateTimeSchema } from "../common/datetime.js";
+import type { Static } from "typebox";
+import { Type } from "typebox";
 import { AttachmentResponseSchema } from "../attachments/attachment.js";
+import { DateTimeSchema } from "../common/datetime.js";
 import { schemaRef } from "../schema-ref.js";
 
 export const MessageSchema = Type.Object(

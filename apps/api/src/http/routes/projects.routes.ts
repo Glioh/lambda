@@ -1,12 +1,13 @@
+import type { ApiRouteDependencies } from "./dependencies.js";
+import type { ApiFastifyInstance } from "./types.js";
 import { generateSlug } from "random-word-slugs";
 import { Type } from "typebox";
+import { AttachmentValidationError, validateAttachments } from "../../attachments/validation.js";
+import { getAuthPrincipal } from "../../auth/clerk-auth.js";
 import { CreateProjectBodySchema, ErrorResponseSchema, GenerateTitleResponseSchema, ProjectIdParamsSchema, ProjectIdResponseSchema, ProjectListItemSchema, ProjectSchema, RenameProjectBodySchema, RenameProjectResponseSchema, schemaRef, } from "../../contracts/index.js";
-import { validateAttachments, AttachmentValidationError } from "../../attachments/validation.js";
 import { ATTACHMENT_REQUEST_BODY_LIMIT } from "../attachment-limits.js";
 import { serializeProject, serializeProjectListItem } from "../serializers.js";
-import { getAuthPrincipal } from "../../auth/clerk-auth.js";
-import { defaultRouteDependencies, type ApiRouteDependencies } from "./dependencies.js";
-import type { ApiFastifyInstance } from "./types.js";
+import { defaultRouteDependencies } from "./dependencies.js";
 
 export function registerProjectRoutes(
 	app: ApiFastifyInstance,

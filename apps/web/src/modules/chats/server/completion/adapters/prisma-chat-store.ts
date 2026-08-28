@@ -1,5 +1,5 @@
-import type { PrismaClient } from "@prisma/client";
 import type { ChatStore } from "../types";
+import type { PrismaClient } from "@prisma/client";
 
 const attachmentSelection = {
 	select: { id: true, mimeType: true, width: true, height: true },

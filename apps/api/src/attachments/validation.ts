@@ -1,4 +1,5 @@
-import { ACCEPTED_IMAGE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_BASE64_CHARS, MAX_TOTAL_ATTACHMENT_BYTES, type AttachmentInput, } from "../contracts/index.js";
+import type { AttachmentInput } from "../contracts/index.js";
+import { ACCEPTED_IMAGE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_BASE64_CHARS, MAX_TOTAL_ATTACHMENT_BYTES, } from "../contracts/index.js";
 
 export class AttachmentValidationError extends Error {}
 

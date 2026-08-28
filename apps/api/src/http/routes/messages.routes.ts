@@ -1,12 +1,14 @@
+import type { RollbackResult } from "../../contracts/index.js";
+import type { ApiRouteDependencies } from "./dependencies.js";
+import type { ApiFastifyInstance } from "./types.js";
 import { Type } from "typebox";
-import { CreateMessageBodySchema, EditMessageBodySchema, ErrorResponseSchema, MessageParamsSchema, MessageSchema, ProjectIdParamsSchema, RollbackResponseSchema, schemaRef, type RollbackResult, } from "../../contracts/index.js";
-import { validateAttachments, AttachmentValidationError } from "../../attachments/validation.js";
+import { AttachmentValidationError, validateAttachments } from "../../attachments/validation.js";
+import { getAuthPrincipal } from "../../auth/clerk-auth.js";
+import { CreateMessageBodySchema, EditMessageBodySchema, ErrorResponseSchema, MessageParamsSchema, MessageSchema, ProjectIdParamsSchema, RollbackResponseSchema, schemaRef, } from "../../contracts/index.js";
 import { rollbackScope } from "../../messages/rollback.js";
 import { ATTACHMENT_REQUEST_BODY_LIMIT } from "../attachment-limits.js";
 import { serializeMessage } from "../serializers.js";
-import { getAuthPrincipal } from "../../auth/clerk-auth.js";
-import { defaultRouteDependencies, type ApiRouteDependencies } from "./dependencies.js";
-import type { ApiFastifyInstance } from "./types.js";
+import { defaultRouteDependencies } from "./dependencies.js";
 
 // Define fields to select from database so we dont keep requesting whole message
 const messageSelect = {

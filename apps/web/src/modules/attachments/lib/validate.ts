@@ -1,4 +1,5 @@
-import { ACCEPTED_IMAGE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_BASE64_CHARS, MAX_TOTAL_ATTACHMENT_BYTES, type UnvalidatedAttachment, } from "../constants";
+import type { UnvalidatedAttachment } from "../constants";
+import { ACCEPTED_IMAGE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE, MAX_BASE64_CHARS, MAX_TOTAL_ATTACHMENT_BYTES, } from "../constants";
 
 /** Attachment proven safe to persist, including decoded byte size. */
 export interface ValidatedAttachment extends UnvalidatedAttachment {
