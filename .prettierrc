@@ -12,5 +12,7 @@
 	"quoteProps": "as-needed",
 	"proseWrap": "preserve",
 	"endOfLine": "lf",
-	"plugins": ["prettier-plugin-one-line-imports"]
+	"plugins": ["prettier-plugin-one-line-imports", "@ianvs/prettier-plugin-sort-imports"],
+	"importOrder": ["", "<TYPES>", "<THIRD_PARTY_MODULES>", "^[.]"],
+	"importOrderTypeScriptVersion": "5.9.3"
 }

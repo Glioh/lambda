@@ -33,6 +33,7 @@
 		"format:check": "prettier . --check"
 	},
 	"devDependencies": {
+		"@ianvs/prettier-plugin-sort-imports": "^4.7.1",
 		"@kubb/plugin-fetch": "5.0.0-beta.109",
 		"@kubb/plugin-react-query": "5.0.0-beta.109",
 		"@kubb/plugin-ts": "5.0.0-beta.109",
