@@ -6,7 +6,6 @@ import { MarketingChrome } from "@/modules/shell/ui/components/marketing-chrome"
 import { makeQueryClient } from "@/lib/query-client";
 import { listProjectsQueryOptions } from "@lambda/api-client/query";
 import { createServerApiClient } from "@/lib/api/server-client";
-import { QueryProvider } from "./query-provider";
 
 /** The cookie SidebarProvider persists its open/closed state to. */
 const SIDEBAR_COOKIE_NAME = "sidebar_state";
@@ -42,11 +41,9 @@ const Layout = async ({ children }: Props) => {
 	}
 
 	return (
-		<QueryProvider>
-			<HydrationBoundary state={dehydrate(queryClient)}>
-				<AppShell defaultOpen={defaultOpen}>{children}</AppShell>
-			</HydrationBoundary>
-		</QueryProvider>
+		<HydrationBoundary state={dehydrate(queryClient)}>
+			<AppShell defaultOpen={defaultOpen}>{children}</AppShell>
+		</HydrationBoundary>
 	);
 };
 
