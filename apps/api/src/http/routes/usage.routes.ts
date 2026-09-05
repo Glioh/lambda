@@ -23,7 +23,7 @@ export function registerUsageRoutes(
 		},
 		async request => {
 			const auth = getAuthPrincipal(request);
-			const status = await getUsageStatus(request, auth.userId);
+			const status = await getUsageStatus(auth.userId, auth.isPro);
 			return status
 				? {
 						remainingPoints: status.remainingPoints,

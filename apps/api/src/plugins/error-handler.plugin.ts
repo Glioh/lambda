@@ -1,10 +1,26 @@
 import fp from "fastify-plugin";
+import { ApplicationError } from "../application-error.js";
 
 export const errorHandlerPlugin = fp(
 	async app => {
 		// Fastify default 500 error response shows actual internal error message.
 		// We override it to avoid leaking internal error details to clients.
 		app.setErrorHandler((error, request, reply) => {
+			if (error instanceof ApplicationError) {
+				const statusCode =
+					error.code === "NOT_FOUND" ? 404 : error.code === "USAGE_LIMIT_EXCEEDED" ? 429 : 400;
+				return reply.code(statusCode).send({
+					statusCode,
+					error:
+						statusCode === 404
+							? "Not Found"
+							: statusCode === 429
+								? "Too Many Requests"
+								: "Bad Request",
+					message: error.message,
+					...(statusCode === 429 ? { code: error.code } : {}),
+				});
+			}
 			const statusCode =
 				typeof error === "object" &&
 				error !== null &&

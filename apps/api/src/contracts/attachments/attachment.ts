@@ -1,12 +1,13 @@
-import type { Static } from "typebox";
 import { Type } from "typebox";
+import { MAX_BASE64_CHARS } from "../../attachments/policy.js";
 
-export const ACCEPTED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"] as const;
-export const MAX_ATTACHMENT_BYTES = 4 * 1024 * 1024;
-export const MAX_TOTAL_ATTACHMENT_BYTES = 3 * 1024 * 1024;
-export const MAX_ATTACHMENTS_PER_MESSAGE = 4;
-export const MAX_BASE64_CHARS = Math.ceil((MAX_ATTACHMENT_BYTES * 4) / 3) + 4;
-
+export {
+	ACCEPTED_IMAGE_TYPES,
+	MAX_ATTACHMENT_BYTES,
+	MAX_TOTAL_ATTACHMENT_BYTES,
+	MAX_ATTACHMENTS_PER_MESSAGE,
+	MAX_BASE64_CHARS,
+} from "../../attachments/policy.js";
 const MimeTypeSchema = Type.Union([
 	Type.Literal("image/png"),
 	Type.Literal("image/jpeg"),
@@ -23,7 +24,7 @@ export const AttachmentInputSchema = Type.Object(
 	},
 	{ $id: "AttachmentInput" },
 );
-export type AttachmentInput = Static<typeof AttachmentInputSchema>;
+export type { AttachmentInput } from "../../attachments/policy.js";
 
 export const AttachmentResponseSchema = Type.Object(
 	{

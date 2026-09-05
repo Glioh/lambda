@@ -21,7 +21,11 @@ export const resolveClerkPrincipal: PrincipalResolver = request => {
 		return null;
 	}
 
-	return { userId: auth.userId, sessionId: auth.sessionId ?? null };
+	return {
+		userId: auth.userId,
+		sessionId: auth.sessionId ?? null,
+		isPro: auth.has?.({ plan: "pro" }) ?? false,
+	};
 };
 
 export function getAuthPrincipal(request: FastifyRequest): AuthPrincipal {

@@ -1,6 +1,12 @@
 import { prisma } from "../../db.js";
 import { generateChatTitle } from "../../projects/title.js";
-import { chargeCredits, getUsageStatus } from "../../usage/usage.js";
+import { usageRepository } from "../../repositories/usage.repository.js";
+import { usageService } from "../../services/usage.service.js";
+
+const { chargeCredits, getUsageStatus } = usageService(
+	usageRepository(prisma),
+	() => process.env.NODE_ENV === "development" && process.env.DISABLE_USAGE_LIMITS === "true",
+);
 
 export type ApiRouteDependencies = {
 	prisma: typeof prisma;

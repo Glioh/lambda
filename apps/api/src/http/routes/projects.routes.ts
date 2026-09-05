@@ -1,10 +1,10 @@
 import type { ApiRouteDependencies } from "./dependencies.js";
 import type { ApiFastifyInstance } from "./types.js";
-import { generateSlug } from "random-word-slugs";
 import { Type } from "typebox";
-import { AttachmentValidationError, validateAttachments } from "../../attachments/validation.js";
 import { getAuthPrincipal } from "../../auth/clerk-auth.js";
 import { CreateProjectBodySchema, ErrorResponseSchema, GenerateTitleResponseSchema, ProjectIdParamsSchema, ProjectIdResponseSchema, ProjectListItemSchema, ProjectSchema, RenameProjectBodySchema, RenameProjectResponseSchema, schemaRef, } from "../../contracts/index.js";
+import { projectRepository } from "../../repositories/project.repository.js";
+import { projectService } from "../../services/project.service.js";
 import { ATTACHMENT_REQUEST_BODY_LIMIT } from "../attachment-limits.js";
 import { serializeProject, serializeProjectListItem } from "../serializers.js";
 import { defaultRouteDependencies } from "./dependencies.js";
@@ -14,6 +14,7 @@ export function registerProjectRoutes(
 	dependencies: ApiRouteDependencies = defaultRouteDependencies,
 ) {
 	const { prisma, chargeCredits, generateChatTitle } = dependencies;
+	const service = projectService(projectRepository(prisma), chargeCredits, generateChatTitle);
 
 	app.get(
 		"/api/projects",
@@ -28,18 +29,7 @@ export function registerProjectRoutes(
 		},
 		async request => {
 			const auth = getAuthPrincipal(request);
-			const projects = await prisma.project.findMany({
-				where: { userId: auth.userId },
-				orderBy: { updatedAt: "desc" },
-				take: 200,
-				select: {
-					id: true,
-					name: true,
-					createdAt: true,
-					updatedAt: true,
-				},
-			});
-			return projects.map(serializeProjectListItem);
+			return (await service.list(auth.userId)).map(serializeProjectListItem);
 		},
 	);
 
@@ -56,29 +46,9 @@ export function registerProjectRoutes(
 				},
 			},
 		},
-		async (request, reply) => {
+		async request => {
 			const auth = getAuthPrincipal(request);
-			const project = await prisma.project.findFirst({
-				where: {
-					id: request.params.projectId,
-					userId: auth.userId,
-				},
-				select: {
-					id: true,
-					name: true,
-					createdAt: true,
-					updatedAt: true,
-					titleGeneratedAt: true,
-				},
-			});
-			if (!project) {
-				return reply.code(404).send({
-					statusCode: 404,
-					error: "Not Found",
-					message: "Project not found.",
-				});
-			}
-			return serializeProject(project);
+			return serializeProject(await service.get(auth.userId, request.params.projectId));
 		},
 	);
 
@@ -100,55 +70,9 @@ export function registerProjectRoutes(
 		},
 		async (request, reply) => {
 			const auth = getAuthPrincipal(request);
-
-			// Charge credits for the request. If the user has insufficient credits, this will return a 429 response.
-			if (!(await chargeCredits(request, auth.userId, reply))) {
-				return reply;
-			}
-
-			// Validate that the message is not empty. If it is, return a 400 response.
-			if (!request.body.value.trim() && !request.body.attachments?.length) {
-				return reply.code(400).send({
-					statusCode: 400,
-					error: "Bad Request",
-					message: "Message cannot be empty.",
-				});
-			}
-
-			let attachments;
-			try {
-				attachments = validateAttachments(request.body.attachments ?? []);
-			} catch (error) {
-				return reply.code(400).send({
-					statusCode: 400,
-					error: "Bad Request",
-					message:
-						error instanceof AttachmentValidationError ? error.message : "Attachments are invalid.",
-				});
-			}
-
-			const project = await prisma.project.create({
-				data: {
-					userId: auth.userId,
-					name: generateSlug(2, { format: "kebab" }),
-					messages: {
-						create: {
-							content: request.body.value,
-							role: "USER",
-							type: "RESULT",
-							...(attachments.length ? { attachments: { create: attachments } } : {}),
-						},
-					},
-				},
-				select: {
-					id: true,
-					name: true,
-					createdAt: true,
-					updatedAt: true,
-					titleGeneratedAt: true,
-				},
-			});
-			return reply.code(201).send(serializeProject(project));
+			return reply
+				.code(201)
+				.send(serializeProject(await service.create(auth.userId, request.body, auth.isPro)));
 		},
 	);
 
@@ -168,32 +92,9 @@ export function registerProjectRoutes(
 				},
 			},
 		},
-		async (request, reply) => {
+		async request => {
 			const auth = getAuthPrincipal(request);
-			const name = request.body.name.trim();
-			if (!name || name.length > 100) {
-				return reply.code(400).send({
-					statusCode: 400,
-					error: "Bad Request",
-					message: name ? "Name is too long." : "Name cannot be empty.",
-				});
-			}
-
-			const result = await prisma.project.updateMany({
-				where: {
-					id: request.params.projectId,
-					userId: auth.userId,
-				},
-				data: { name, titleGeneratedAt: new Date() },
-			});
-			if (!result.count) {
-				return reply.code(404).send({
-					statusCode: 404,
-					error: "Not Found",
-					message: "Project not found.",
-				});
-			}
-			return { id: request.params.projectId, name };
+			return service.rename(auth.userId, request.params.projectId, request.body.name);
 		},
 	);
 
@@ -210,22 +111,9 @@ export function registerProjectRoutes(
 				},
 			},
 		},
-		async (request, reply) => {
+		async request => {
 			const auth = getAuthPrincipal(request);
-			const result = await prisma.project.deleteMany({
-				where: {
-					id: request.params.projectId,
-					userId: auth.userId,
-				},
-			});
-			if (!result.count) {
-				return reply.code(404).send({
-					statusCode: 404,
-					error: "Not Found",
-					message: "Project not found.",
-				});
-			}
-			return { id: request.params.projectId };
+			return service.delete(auth.userId, request.params.projectId);
 		},
 	);
 
@@ -243,48 +131,7 @@ export function registerProjectRoutes(
 		},
 		async request => {
 			const auth = getAuthPrincipal(request);
-			const claimedAt = new Date();
-			const claim = await prisma.project.updateMany({
-				where: {
-					id: request.params.projectId,
-					userId: auth.userId,
-					titleGeneratedAt: null,
-				},
-				data: { titleGeneratedAt: claimedAt },
-			});
-			if (!claim.count) return null;
-
-			const source = await prisma.message.findMany({
-				where: {
-					projectId: request.params.projectId,
-					type: { not: "SUMMARY" },
-				},
-				orderBy: { createdAt: "asc" },
-				take: 2,
-				select: {
-					role: true,
-					content: true,
-					attachments: { select: { id: true }, take: 1 },
-				},
-			});
-			const name = await generateChatTitle(
-				source.map(message => ({
-					role: message.role,
-					content: message.content,
-					hasImage: message.attachments.length > 0,
-				})),
-			);
-			if (!name) return null;
-
-			const result = await prisma.project.updateMany({
-				where: {
-					id: request.params.projectId,
-					userId: auth.userId,
-					titleGeneratedAt: claimedAt,
-				},
-				data: { name },
-			});
-			return result.count ? { id: request.params.projectId, name } : null;
+			return service.generateTitle(auth.userId, request.params.projectId);
 		},
 	);
 }

@@ -4,6 +4,7 @@ import type { FastifyRequest } from "fastify";
 export type AuthPrincipal = {
 	userId: string;
 	sessionId: string | null;
+	isPro?: boolean;
 };
 
 export type PrincipalResolver = (
