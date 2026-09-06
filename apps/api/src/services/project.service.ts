@@ -11,7 +11,9 @@ export function projectService(
 	title: (messages: TitleSourceMessage[]) => Promise<string | null>,
 ) {
 	return {
-		list: (userId: string) => repository.list(userId),
+		list(userId: string) {
+			return repository.list(userId);
+		},
 		async get(userId: string, id: string) {
 			const project = await repository.findOwned(userId, id);
 			if (!project) throw new ApplicationError("NOT_FOUND", "Project not found.");
