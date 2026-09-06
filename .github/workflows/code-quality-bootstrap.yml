@@ -37,7 +37,6 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
-      - run: npm test
       - name: Verify architectural object-method rule rejects arrow-valued operations
         run: |
           cat > apps/api/src/lint-rule-check.repository.ts <<'EOF'
@@ -64,3 +63,30 @@ jobs:
 
           npx eslint apps/api/src/lint-rule-callback-check.ts
           rm apps/api/src/lint-rule-callback-check.ts
+      - name: Verify lint-staged only checks staged files and blocks staged violations
+        run: |
+          cat > apps/api/src/unstaged-lint-check.repository.ts <<'EOF'
+          export function unstagedLintCheck() {
+            return { invalid: async () => 1 };
+          }
+          EOF
+
+          printf '\n' >> AGENTS.md
+          git add AGENTS.md
+          npx lint-staged
+          git reset --hard HEAD
+
+          cat > apps/api/src/staged-lint-check.repository.ts <<'EOF'
+          export function stagedLintCheck() {
+            return { invalid: async () => 1 };
+          }
+          EOF
+
+          git add apps/api/src/staged-lint-check.repository.ts
+          if npx lint-staged; then
+            echo "Expected lint-staged to block the staged repository violation."
+            exit 1
+          fi
+
+          git reset --hard HEAD
+      - run: npm test
