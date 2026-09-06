@@ -18,8 +18,8 @@ const messageSelect = {
 
 function messageTransaction(tx: Prisma.TransactionClient) {
 	return {
-		target: async (projectId: string, id: string) =>
-			tx.message.findFirst({
+		async target(projectId: string, id: string) {
+			return tx.message.findFirst({
 				where: { id, projectId },
 				select: {
 					id: true,
@@ -29,32 +29,39 @@ function messageTransaction(tx: Prisma.TransactionClient) {
 					content: true,
 					attachments: { select: { id: true }, take: 1 },
 				},
-			}),
-		priorPrompt: async (projectId: string, before: Date) =>
-			tx.message.findFirst({
+			});
+		},
+		async priorPrompt(projectId: string, before: Date) {
+			return tx.message.findFirst({
 				where: { projectId, role: "USER", createdAt: { lt: before } },
 				orderBy: { createdAt: "desc" },
 				select: { content: true, attachments: { select: { id: true }, take: 1 } },
-			}),
-		edit: async (id: string, content: string) =>
-			tx.message.update({ where: { id }, data: { content } }),
-		rollback: async (projectId: string, boundary: Date, edge: RollbackEdge) =>
-			tx.message.deleteMany({ where: { projectId, ...rollbackScope(boundary, edge) } }),
-		touch: async (id: string, updatedAt: Date) =>
-			tx.project.update({ where: { id }, data: { updatedAt } }),
+			});
+		},
+		async edit(id: string, content: string) {
+			return tx.message.update({ where: { id }, data: { content } });
+		},
+		async rollback(projectId: string, boundary: Date, edge: RollbackEdge) {
+			return tx.message.deleteMany({ where: { projectId, ...rollbackScope(boundary, edge) } });
+		},
+		async touch(id: string, updatedAt: Date) {
+			return tx.project.update({ where: { id }, data: { updatedAt } });
+		},
 	};
 }
 
 export function messageRepository(prisma: PrismaClient) {
 	return {
-		findOwnedProject: async (userId: string, id: string) =>
-			prisma.project.findFirst({ where: { id, userId }, select: { id: true } }),
-		list: async (userId: string, projectId: string) =>
-			prisma.message.findMany({
+		async findOwnedProject(userId: string, id: string) {
+			return prisma.project.findFirst({ where: { id, userId }, select: { id: true } });
+		},
+		async list(userId: string, projectId: string) {
+			return prisma.message.findMany({
 				where: { projectId, project: { userId } },
 				orderBy: [{ createdAt: "asc" }, { type: "asc" }],
 				select: messageSelect,
-			}),
+			});
+		},
 		async createWithActivity(
 			projectId: string,
 			content: string,
@@ -76,7 +83,8 @@ export function messageRepository(prisma: PrismaClient) {
 			]);
 			return message;
 		},
-		transaction: <T>(work: (transaction: ReturnType<typeof messageTransaction>) => Promise<T>) =>
-			prisma.$transaction(tx => work(messageTransaction(tx))),
+		transaction<T>(work: (transaction: ReturnType<typeof messageTransaction>) => Promise<T>) {
+			return prisma.$transaction(tx => work(messageTransaction(tx)));
+		},
 	};
 }
