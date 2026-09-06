@@ -38,6 +38,12 @@ Before reporting completion of an implementation task, run:
 
 If formatting fails, run `npm run format` and re-run the checks.
 
+## TypeScript conventions
+
+- Repository, service, and controller operations use object method syntax when exposed from an object.
+- Prefer `async create(...) { return ...; }` over `create: async (...) => ...` for those operations.
+- ESLint is the source of truth for mechanically enforceable code conventions; do not disable lint rules to bypass repository standards.
+
 ## Agent skills
 
 ### Issue tracker
