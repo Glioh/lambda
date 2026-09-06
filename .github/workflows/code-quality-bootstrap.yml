@@ -1,0 +1,66 @@
+name: Code quality bootstrap
+
+on:
+  push:
+    branches:
+      - chore/repository-code-quality
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://ci:ci@localhost:5432/ci"
+      HUSKY: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.13.0
+          cache: npm
+      - name: Sync package lock
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit package lock when changed
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore: sync package lock [skip ci]"
+          git push
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: Verify architectural object-method rule rejects arrow-valued operations
+        run: |
+          cat > apps/api/src/lint-rule-check.repository.ts <<'EOF'
+          export function lintRuleCheck() {
+            return {
+              invalid: async () => 1,
+            };
+          }
+          EOF
+
+          if npx eslint apps/api/src/lint-rule-check.repository.ts; then
+            echo "Expected ESLint to reject an arrow-valued repository operation."
+            exit 1
+          fi
+
+          rm apps/api/src/lint-rule-check.repository.ts
+      - name: Verify ordinary callback objects remain valid outside architectural scope
+        run: |
+          cat > apps/api/src/lint-rule-callback-check.ts <<'EOF'
+          export const callbackConfig = {
+            onSuccess: () => undefined,
+          };
+          EOF
+
+          npx eslint apps/api/src/lint-rule-callback-check.ts
+          rm apps/api/src/lint-rule-callback-check.ts
