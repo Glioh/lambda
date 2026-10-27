@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import type { ApiRouteDependencies } from "../src/http/routes/dependencies.js";
+import type { ApiRouteDependencies } from "../src/routes/types.js";
 import type { FastifyInstance } from "fastify";
 import type { TSchema } from "typebox";
 import Fastify from "fastify";
@@ -8,15 +8,19 @@ import { Type } from "typebox";
 import { buildApp } from "../src/app.js";
 import { DEFAULT_HOST, DEFAULT_PORT, getServerConfig } from "../src/config.js";
 import * as contracts from "../src/contracts/index.js";
+import { createDatabase } from "../src/database/database.js";
+import { messageService } from "../src/services/message.service.js";
+import { projectService } from "../src/services/project.service.js";
 
 describe("API application", () => {
 	let app: FastifyInstance | undefined;
-	const routeDependencies = {
-		prisma: { project: { findMany: async () => [] } },
-		chargeCredits: async () => true,
-		getUsageStatus: async () => null,
-		generateChatTitle: async () => null,
-	} as unknown as ApiRouteDependencies;
+	const database = createDatabase({ project: { findMany: async () => [] } } as never);
+	const chargeCredits = async () => {};
+	const services = {
+		projects: projectService(database.projects, chargeCredits, async () => null),
+		messages: messageService(database, chargeCredits),
+		usage: { chargeCredits, getUsageStatus: async () => null },
+	} satisfies ApiRouteDependencies;
 
 	afterEach(async () => {
 		await app?.close();
@@ -26,7 +30,8 @@ describe("API application", () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
 		assert.equal(app.server.listening, false);
@@ -45,7 +50,8 @@ describe("API application", () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 		const response = await app.inject({ method: "GET", url: "/api/openapi.json" });
 
@@ -86,6 +92,23 @@ describe("API application", () => {
 		assert.deepEqual(projectGet.get?.responses?.[401]?.content?.["application/json"]?.schema, {
 			$ref: "#/components/schemas/ErrorResponse",
 		});
+		const schemaProperty = (schemaName: string, propertyName: string) =>
+			(
+				document.components?.schemas?.[schemaName] as {
+					properties?: Record<string, unknown>;
+				}
+			)?.properties?.[propertyName];
+		for (const schemaName of ["Project", "ProjectListItem", "Message"]) {
+			for (const propertyName of ["createdAt", "updatedAt"]) {
+				assert.deepEqual(schemaProperty(schemaName, propertyName), {
+					type: "string",
+					format: "date-time",
+				});
+			}
+		}
+		for (const schemaName of ["Project", "ProjectListItem"]) {
+			assert.deepEqual(schemaProperty(schemaName, "titleFinalized"), { type: "boolean" });
+		}
 		const operationIds = {
 			"GET /api/projects": "listProjects",
 			"GET /api/projects/{projectId}": "getProject",
@@ -131,23 +154,30 @@ describe("API application", () => {
 	});
 
 	it("keeps exported TypeBox schemas without $id route-local", () => {
-		assert.equal(Object.prototype.hasOwnProperty.call(contracts.DateTimeSchema, "$id"), false);
-		assert.equal(contracts.DateTimeSchema["~kind"], "String");
+		const responseDateTime = contracts.ResponseDateTime();
+		assert.equal(Object.prototype.hasOwnProperty.call(responseDateTime, "$id"), false);
+		assert.equal(responseDateTime["~kind"], "String");
+		assert.deepEqual(JSON.parse(JSON.stringify(responseDateTime)), {
+			type: "string",
+			format: "date-time",
+		});
 
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
-		assert.equal(app.getSchemas()["DateTimeSchema"], undefined);
+		assert.equal(app.getSchemas()["ResponseDateTime"], undefined);
 	});
 
 	it("resolves shared schema references inside protected routes", async () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
 		await app.ready();
@@ -228,7 +258,8 @@ describe("API application", () => {
 				resolved = true;
 				return { userId: "user-1", sessionId: "session-1" };
 			},
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
 		const response = await app.inject({ method: "GET", url: "/api/projects" });
@@ -239,7 +270,12 @@ describe("API application", () => {
 	});
 
 	it("returns 401 when principal resolver returns no principal", async () => {
-		app = buildApp({ logger: false, principalResolver: () => null, routeDependencies });
+		app = buildApp({
+			logger: false,
+			principalResolver: () => null,
+			proPlanResolver: () => false,
+			services,
+		});
 
 		const response = await app.inject({ method: "GET", url: "/api/projects" });
 
@@ -259,7 +295,8 @@ describe("API application", () => {
 				resolved += 1;
 				return null;
 			},
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
 		const health = await app.inject({ method: "GET", url: "/api/health" });
@@ -276,7 +313,8 @@ describe("API application", () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
 		const response = await app.inject({
@@ -296,7 +334,8 @@ describe("API application", () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 
 		const response = await app.inject({
@@ -315,7 +354,12 @@ describe("API application", () => {
 	});
 
 	it("uses Fastify's native unmatched-route response", async () => {
-		app = buildApp({ logger: false, principalResolver: () => null, routeDependencies });
+		app = buildApp({
+			logger: false,
+			principalResolver: () => null,
+			proPlanResolver: () => false,
+			services,
+		});
 
 		const response = await app.inject({ method: "GET", url: "/api/missing" });
 
@@ -330,7 +374,8 @@ describe("API application", () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies,
+			proPlanResolver: () => false,
+			services,
 		});
 		app.get("/api/test-error", async () => {
 			throw new Error("secret internal detail");
@@ -349,16 +394,16 @@ describe("API application", () => {
 		app = buildApp({
 			logger: false,
 			principalResolver: () => ({ userId: "user-1", sessionId: "session-1" }),
-			routeDependencies: {
-				...routeDependencies,
-				prisma: {
-					project: {
-						findMany: async () => {
-							throw new Error("secret protected detail");
-						},
+			proPlanResolver: () => false,
+			services: {
+				...services,
+				projects: {
+					...services.projects,
+					list: async () => {
+						throw new Error("secret protected detail");
 					},
 				},
-			} as unknown as ApiRouteDependencies,
+			},
 		});
 
 		const response = await app.inject({ method: "GET", url: "/api/projects" });

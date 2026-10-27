@@ -191,6 +191,14 @@
 	}
 }
 
+.title-fade {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: clip;
+	-webkit-mask-image: linear-gradient(to right, #000 calc(100% - 1.5em), transparent);
+	mask-image: linear-gradient(to right, #000 calc(100% - 1.5em), transparent);
+}
+
 /* Animations */
 @theme inline {
 	--animate-first: moveVertical 30s ease infinite;

@@ -36,7 +36,9 @@ export const ChatListItem = ({ chat }: Props) => {
 					// cover the chat the user just picked.
 					onClick={() => isMobile && setOpenMobile(false)}
 				>
-					<span className="truncate">{chat.name}</span>
+					<span className="title-fade" title={chat.name}>
+						{chat.name}
+					</span>
 				</Link>
 			</SidebarMenuButton>
 
@@ -48,6 +50,7 @@ export const ChatListItem = ({ chat }: Props) => {
 				</DropdownMenuTrigger>
 				<DropdownMenuContent side="right" align="start" className="w-44">
 					<DropdownMenuItem
+						disabled={!chat.titleFinalized}
 						// preventDefault so the menu's close animation doesn't race the
 						// dialog mount — without it the dialog opens and immediately
 						// loses focus to the unmounting menu.

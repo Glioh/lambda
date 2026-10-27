@@ -38,7 +38,7 @@ export const ChatHeader = ({ projectId }: Props) => {
 	const hasProAccess = isLoaded ? has?.({ plan: "pro" }) : undefined;
 
 	return (
-		<header className="flex shrink-0 items-center gap-1 border-b p-2">
+		<header className="flex min-w-0 shrink-0 items-center gap-1 border-b p-2">
 			<SidebarTrigger />
 			<Separator orientation="vertical" className="mr-1 !h-4" />
 
@@ -47,14 +47,17 @@ export const ChatHeader = ({ projectId }: Props) => {
 					<Button
 						variant="ghost"
 						size="sm"
-						className="min-w-0 focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity"
+						className="min-w-0 shrink focus-visible:ring-0 hover:bg-transparent hover:opacity-75 transition-opacity"
 					>
-						<span className="truncate text-sm font-medium">{project.name}</span>
+						<span className="title-fade text-sm font-medium" title={project.name}>
+							{project.name}
+						</span>
 						<ChevronDown className="shrink-0" />
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent side="bottom" align="start" className="w-44">
 					<DropdownMenuItem
+						disabled={!project.titleFinalized}
 						onSelect={event => {
 							event.preventDefault();
 							setRenameOpen(true);
@@ -76,7 +79,7 @@ export const ChatHeader = ({ projectId }: Props) => {
 				</DropdownMenuContent>
 			</DropdownMenu>
 
-			<div className="ml-auto flex items-center gap-x-2">
+			<div className="ml-auto flex shrink-0 items-center gap-x-2">
 				{isLoaded && !hasProAccess && (
 					<Button asChild size="sm" variant="tertiary">
 						<Link href="/pricing">

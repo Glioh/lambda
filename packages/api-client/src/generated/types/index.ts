@@ -100,6 +100,7 @@ export type {
 	RenameProjectStatus400,
 	RenameProjectStatus401,
 	RenameProjectStatus404,
+	RenameProjectStatus409,
 } from "./RenameProject";
 export type { RenameProjectResponse } from "./RenameProjectResponse";
 export type {

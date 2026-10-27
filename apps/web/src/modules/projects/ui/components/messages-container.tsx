@@ -120,38 +120,28 @@ export const MessagesContainer = ({ projectId }: Props) => {
 	const { data: projectResponse } = useQuery(getProjectQueryOptions({ path: { projectId } }));
 	const project = projectResponse;
 
-	const generateTitle = useMutation(generateProjectTitleMutationOptions());
+	const generateTitle = useMutation({
+		...generateProjectTitleMutationOptions(),
+		// A null result still finalizes the title. Refresh even if this view unmounts.
+		onSettled: () =>
+			Promise.all([
+				queryClient.invalidateQueries({ queryKey: getProjectQueryKey({ path: { projectId } }) }),
+				queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() }),
+			]),
+	});
 
 	/**
 	 * Names the chat once it has an answer worth naming. The server is the real
-	 * guard (it no-ops unless `titleGeneratedAt` is null); this check just avoids
+	 * guard (it no-ops once `titleFinalized` is true); this check just avoids
 	 * a pointless round trip after every subsequent message.
 	 */
 	const maybeGenerateTitle = useCallback(() => {
-		if (project?.titleGeneratedAt || generateTitle.isPending) {
+		if (project?.titleFinalized !== false || generateTitle.isPending || generateTitle.isSuccess) {
 			return;
 		}
 
-		generateTitle.mutate(
-			{ path: { projectId } },
-			{
-				onSuccess: result => {
-					if (!result) {
-						return;
-					}
-
-					// The sidebar lives above this view in the layout and shares the
-					// same QueryClient, so invalidating is all it takes to retitle it.
-					void queryClient.invalidateQueries({
-						queryKey: getProjectQueryKey({ path: { projectId } }),
-					});
-					void queryClient.invalidateQueries({ queryKey: listProjectsQueryKey() });
-				},
-				// Titling is cosmetic: a failure must never surface as an error toast.
-				onError: () => undefined,
-			},
-		);
-	}, [project?.titleGeneratedAt, generateTitle, projectId, queryClient]);
+		generateTitle.mutate({ path: { projectId } });
+	}, [project?.titleFinalized, generateTitle, projectId]);
 
 	const retryFrom = useMutation(retryMessageMutationOptions());
 	const editAndResend = useMutation(editAndResendMessageMutationOptions());

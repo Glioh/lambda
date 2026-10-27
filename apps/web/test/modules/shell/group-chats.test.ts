@@ -13,11 +13,22 @@ const NOW = new Date(2026, 7, 2, 14, 0, 0).getTime();
 const chatAt = (id: string, daysAgo: number, hour = 10): ChatListEntry => ({
 	id,
 	name: `chat-${id}`,
+	titleFinalized: true,
 	updatedAt: new Date(2026, 7, 2 - daysAgo, hour, 0, 0),
 });
 
 test("groupChatsByRecency returns no groups for an empty list", () => {
 	assert.deepEqual(groupChatsByRecency([], NOW), []);
+});
+
+test("groupChatsByRecency preserves full titles and rename availability", () => {
+	const pending = {
+		...chatAt("pending", 0),
+		name: "Can you help me understand binary search trees in Java",
+		titleFinalized: false,
+	};
+	const finalized = chatAt("finalized", 0);
+	assert.deepEqual(groupChatsByRecency([pending, finalized], NOW)[0].chats, [pending, finalized]);
 });
 
 test("groupChatsByRecency buckets by calendar recency", () => {

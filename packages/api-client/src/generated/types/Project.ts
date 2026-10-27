@@ -3,6 +3,7 @@
 export type Project = {
 	id: string;
 	name: string;
+	titleFinalized: boolean;
 	/**
 	 * @description
 	 * Format: `date-time`
@@ -15,5 +16,4 @@ export type Project = {
 	 * @type string
 	 */
 	updatedAt: string;
-	titleGeneratedAt: string | null;
 };

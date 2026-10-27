@@ -81,25 +81,6 @@
 					}
 				}
 			},
-			"GenerateTitleResponse": {
-				"anyOf": [
-					{
-						"type": "object",
-						"required": ["id", "name"],
-						"properties": {
-							"id": {
-								"type": "string"
-							},
-							"name": {
-								"type": "string"
-							}
-						}
-					},
-					{
-						"type": "null"
-					}
-				]
-			},
 			"Message": {
 				"type": "object",
 				"required": ["id", "content", "role", "type", "createdAt", "updatedAt", "attachments"],
@@ -154,6 +135,18 @@
 					}
 				}
 			},
+			"RollbackResponse": {
+				"type": "object",
+				"required": ["value", "hasAttachments"],
+				"properties": {
+					"value": {
+						"type": "string"
+					},
+					"hasAttachments": {
+						"type": "boolean"
+					}
+				}
+			},
 			"ProjectIdResponse": {
 				"type": "object",
 				"required": ["id"],
@@ -163,15 +156,37 @@
 					}
 				}
 			},
+			"GenerateTitleResponse": {
+				"anyOf": [
+					{
+						"type": "object",
+						"required": ["id", "name"],
+						"properties": {
+							"id": {
+								"type": "string"
+							},
+							"name": {
+								"type": "string"
+							}
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
 			"ProjectListItem": {
 				"type": "object",
-				"required": ["id", "name", "createdAt", "updatedAt"],
+				"required": ["id", "name", "titleFinalized", "createdAt", "updatedAt"],
 				"properties": {
 					"id": {
 						"type": "string"
 					},
 					"name": {
 						"type": "string"
+					},
+					"titleFinalized": {
+						"type": "boolean"
 					},
 					"createdAt": {
 						"type": "string",
@@ -185,13 +200,16 @@
 			},
 			"Project": {
 				"type": "object",
-				"required": ["id", "name", "createdAt", "updatedAt", "titleGeneratedAt"],
+				"required": ["id", "name", "titleFinalized", "createdAt", "updatedAt"],
 				"properties": {
 					"id": {
 						"type": "string"
 					},
 					"name": {
 						"type": "string"
+					},
+					"titleFinalized": {
+						"type": "boolean"
 					},
 					"createdAt": {
 						"type": "string",
@@ -200,17 +218,6 @@
 					"updatedAt": {
 						"type": "string",
 						"format": "date-time"
-					},
-					"titleGeneratedAt": {
-						"anyOf": [
-							{
-								"type": "string",
-								"format": "date-time"
-							},
-							{
-								"type": "null"
-							}
-						]
 					}
 				}
 			},
@@ -223,18 +230,6 @@
 					},
 					"name": {
 						"type": "string"
-					}
-				}
-			},
-			"RollbackResponse": {
-				"type": "object",
-				"required": ["value", "hasAttachments"],
-				"properties": {
-					"value": {
-						"type": "string"
-					},
-					"hasAttachments": {
-						"type": "boolean"
 					}
 				}
 			},
@@ -474,6 +469,16 @@
 						}
 					},
 					"404": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"$ref": "#/components/schemas/ErrorResponse"
+								}
+							}
+						}
+					},
+					"409": {
 						"description": "Default Response",
 						"content": {
 							"application/json": {

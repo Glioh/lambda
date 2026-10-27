@@ -1,5 +1,24 @@
+import type { ApplicationErrorCode } from "../common/errors.js";
 import fp from "fastify-plugin";
-import { ApplicationError } from "../application-error.js";
+import { ApplicationError } from "../common/errors.js";
+
+const applicationErrorResponses = {
+	INVALID_INPUT: { statusCode: 400, error: "Bad Request", includeCode: false },
+	NOT_FOUND: { statusCode: 404, error: "Not Found", includeCode: false },
+	CONFLICT: { statusCode: 409, error: "Conflict", includeCode: true },
+	USAGE_LIMIT_EXCEEDED: { statusCode: 429, error: "Too Many Requests", includeCode: true },
+} satisfies Record<
+	ApplicationErrorCode,
+	{ statusCode: number; error: string; includeCode: boolean }
+>;
+
+function getErrorStatusCode(error: unknown): number {
+	if (typeof error !== "object" || error === null || !("statusCode" in error)) {
+		return 500;
+	}
+
+	return typeof error.statusCode === "number" ? error.statusCode : 500;
+}
 
 export const errorHandlerPlugin = fp(
 	async app => {
@@ -7,28 +26,18 @@ export const errorHandlerPlugin = fp(
 		// We override it to avoid leaking internal error details to clients.
 		app.setErrorHandler((error, request, reply) => {
 			if (error instanceof ApplicationError) {
-				const statusCode =
-					error.code === "NOT_FOUND" ? 404 : error.code === "USAGE_LIMIT_EXCEEDED" ? 429 : 400;
-				return reply.code(statusCode).send({
-					statusCode,
-					error:
-						statusCode === 404
-							? "Not Found"
-							: statusCode === 429
-								? "Too Many Requests"
-								: "Bad Request",
+				const response = applicationErrorResponses[error.code];
+				return reply.code(response.statusCode).send({
+					statusCode: response.statusCode,
+					error: response.error,
 					message: error.message,
-					...(statusCode === 429 ? { code: error.code } : {}),
+					...(response.includeCode ? { code: error.code } : {}),
 				});
 			}
-			const statusCode =
-				typeof error === "object" &&
-				error !== null &&
-				"statusCode" in error &&
-				typeof error.statusCode === "number"
-					? error.statusCode
-					: 500;
-			if (statusCode < 500) return reply.code(statusCode).send(error);
+			const statusCode = getErrorStatusCode(error);
+			if (statusCode < 500) {
+				return reply.code(statusCode).send(error);
+			}
 
 			request.log.error({ err: error }, "Unhandled API error");
 			return reply.code(500).send({

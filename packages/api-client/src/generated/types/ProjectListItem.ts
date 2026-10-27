@@ -3,6 +3,7 @@
 export type ProjectListItem = {
 	id: string;
 	name: string;
+	titleFinalized: boolean;
 	/**
 	 * @description
 	 * Format: `date-time`

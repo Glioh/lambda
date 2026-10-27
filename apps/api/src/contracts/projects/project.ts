@@ -1,13 +1,14 @@
 import type { Static } from "typebox";
 import { Type } from "typebox";
-import { DateTimeSchema } from "../common/datetime.js";
+import { ResponseDateTime } from "../common/datetime.js";
 
 export const ProjectListItemSchema = Type.Object(
 	{
 		id: Type.String(),
 		name: Type.String(),
-		createdAt: DateTimeSchema,
-		updatedAt: DateTimeSchema,
+		titleFinalized: Type.Boolean(),
+		createdAt: ResponseDateTime(),
+		updatedAt: ResponseDateTime(),
 	},
 	{ $id: "ProjectListItem" },
 );
@@ -16,7 +17,6 @@ export type ProjectListItem = Static<typeof ProjectListItemSchema>;
 export const ProjectSchema = Type.Object(
 	{
 		...ProjectListItemSchema.properties,
-		titleGeneratedAt: Type.Union([DateTimeSchema, Type.Null()]),
 	},
 	{ $id: "Project" },
 );

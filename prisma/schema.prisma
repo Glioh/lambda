@@ -20,10 +20,8 @@ model Project {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  /// NULL means `name` is still the random-word-slugs placeholder and the LLM
-  /// titler may overwrite it. Stamped by both the titler and a manual rename,
-  /// so neither can clobber the other.
-  titleGeneratedAt DateTime?
+  /// Manual rename is allowed once the automatic title attempt has completed.
+  titleFinalized Boolean @default(false)
 
   messages Message[]
 

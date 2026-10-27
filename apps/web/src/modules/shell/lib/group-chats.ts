@@ -4,6 +4,7 @@ import { differenceInCalendarDays, format } from "date-fns";
 export interface ChatListEntry {
 	id: string;
 	name: string;
+	titleFinalized: boolean;
 	updatedAt: Date;
 }
 

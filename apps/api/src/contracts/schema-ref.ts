@@ -9,6 +9,8 @@ import { Type } from "typebox";
  */
 export function schemaRef<T extends TSchema>(schema: T) {
 	const id = (schema as T & { $id?: string }).$id;
-	if (typeof id !== "string") throw new Error("schemaRef requires schema with $id");
+	if (typeof id !== "string") {
+		throw new Error("schemaRef requires schema with $id");
+	}
 	return Type.Unsafe<Static<T>>(Type.Ref(id));
 }

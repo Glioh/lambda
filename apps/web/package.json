@@ -8,7 +8,7 @@
 		"start": "next start",
 		"lint": "eslint .",
 		"test": "npm run test:default && npm run test:react-server",
-		"test:default": "node --experimental-test-module-mocks --import tsx --test \"test/api/**/*.test.ts\" \"test/lib/**/*.test.ts\" \"test/modules/**/*.test.ts\"",
+		"test:default": "node --experimental-test-module-mocks --import tsx --test \"test/api/**/*.test.ts\" \"test/lib/**/*.test.ts\" \"test/modules/**/*.test.{ts,tsx}\"",
 		"test:context": "node --import tsx --test \"test/modules/context/**/*.test.ts\"",
 		"test:chat": "node --experimental-test-module-mocks --import tsx --test \"test/modules/messages/**/*.test.ts\" \"test/modules/chats/server/completion/*.test.ts\" && npm run test:react-server",
 		"test:react-server": "node --conditions react-server --import tsx --test \"test/react-server/**/*.test.ts\"",

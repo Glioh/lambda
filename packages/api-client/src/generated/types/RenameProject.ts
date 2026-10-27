@@ -19,6 +19,8 @@ export type RenameProjectStatus401 = ErrorResponse;
 
 export type RenameProjectStatus404 = ErrorResponse;
 
+export type RenameProjectStatus409 = ErrorResponse;
+
 export type RenameProjectBody = {
 	name: string;
 };
@@ -35,4 +37,5 @@ export type RenameProjectResponses = {
 	"400": RenameProjectStatus400;
 	"401": RenameProjectStatus401;
 	"404": RenameProjectStatus404;
+	"409": RenameProjectStatus409;
 };

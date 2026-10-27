@@ -21,6 +21,8 @@ jobs:
         run: |
           changes="$(git status --porcelain -- \
             apps/api/openapi.json \
+            apps/api/src/contracts/index.ts \
+            apps/api/src/database/repositories/repositories.generated.ts \
             packages/api-client/src/generated)"
 
           if [ -n "$changes" ]; then
@@ -31,10 +33,14 @@ jobs:
             echo "Generated diff:"
             git diff -- \
               apps/api/openapi.json \
+              apps/api/src/contracts/index.ts \
+              apps/api/src/database/repositories/repositories.generated.ts \
               packages/api-client/src/generated
 
             untracked="$(git ls-files --others --exclude-standard -- \
               apps/api/openapi.json \
+              apps/api/src/contracts/index.ts \
+              apps/api/src/database/repositories/repositories.generated.ts \
               packages/api-client/src/generated)"
             if [ -n "$untracked" ]; then
               echo
