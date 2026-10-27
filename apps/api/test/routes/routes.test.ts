@@ -642,7 +642,7 @@ describe("message HTTP routes", () => {
 				payload: {},
 			});
 			assert.equal(missing.statusCode, 400);
-			assert.equal(credits, 2);
+			assert.equal(credits, 1);
 		} finally {
 			await close(app);
 		}

@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+env:
+  HUSKY: 0
+
 jobs:
   generated:
     runs-on: ubuntu-latest

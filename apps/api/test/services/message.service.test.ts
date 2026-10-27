@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Database } from "../../src/database/database.js";
 import type { messagesRepository } from "../../src/database/repositories/messages.repository.js";
+import type { projectsRepository } from "../../src/database/repositories/projects.repository.js";
 import { messageService } from "../../src/services/message.service.js";
 
 const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]).toString(
 	"base64",
 );
 
-function database(overrides: Partial<ReturnType<typeof messagesRepository>> = {}) {
+function database(
+	overrides: Partial<ReturnType<typeof messagesRepository>> = {},
+	projectOverrides: Partial<ReturnType<typeof projectsRepository>> = {},
+) {
 	const messages = {
 		list: async () => [],
 		create: async () => ({ id: "message-1" }),
@@ -21,6 +25,7 @@ function database(overrides: Partial<ReturnType<typeof messagesRepository>> = {}
 	const projects = {
 		findById: async () => ({ id: "project-1" }),
 		touch: async () => ({}),
+		...projectOverrides,
 	};
 	return {
 		messages,
@@ -59,8 +64,38 @@ describe("messageService", () => {
 		]);
 	});
 
+	it("does not charge for operations on projects the user does not own", async () => {
+		let charges = 0;
+		const service = messageService(database({}, { findById: async () => null }), async () => {
+			charges += 1;
+		});
+
+		await assert.rejects(() => service.create("user-1", "project-1", { value: "message" }));
+		await assert.rejects(() => service.edit("user-1", "project-1", "message-1", "updated"));
+		await assert.rejects(() => service.retry("user-1", "project-1", "message-1"));
+
+		assert.equal(charges, 0);
+	});
+
+	it("does not charge for invalid message attachments", async () => {
+		let charged = false;
+		const service = messageService(database(), async () => {
+			charged = true;
+		});
+
+		await assert.rejects(() =>
+			service.create("user-1", "project-1", {
+				value: "",
+				attachments: [{ mimeType: "image/png", data: "invalid", width: 1, height: 1 }],
+			}),
+		);
+
+		assert.equal(charged, false);
+	});
+
 	it("rejects edits to non-user messages before mutation", async () => {
 		let edited = false;
+		let charged = false;
 		const service = messageService(
 			database({
 				target: async () => ({ role: "ASSISTANT", attachments: [], createdAt: new Date() }),
@@ -68,7 +103,9 @@ describe("messageService", () => {
 					edited = true;
 				},
 			}),
-			async () => {},
+			async () => {
+				charged = true;
+			},
 		);
 
 		await assert.rejects(
@@ -79,6 +116,7 @@ describe("messageService", () => {
 			},
 		);
 		assert.equal(edited, false);
+		assert.equal(charged, false);
 	});
 
 	it("keeps the selected user message for edit and retry", async () => {
@@ -140,12 +178,34 @@ describe("messageService", () => {
 		});
 		assert.deepEqual(deletionOptions, { inclusive: true });
 
-		const summaryService = messageService(
+		let summaryCharged = false;
+		const unchargedSummaryService = messageService(
 			database({
 				target: async () => ({ type: "SUMMARY" }),
 			}),
-			async () => {},
+			async () => {
+				summaryCharged = true;
+			},
 		);
-		await assert.rejects(() => summaryService.retry("user-1", "project-1", "message-1"));
+		await assert.rejects(() => unchargedSummaryService.retry("user-1", "project-1", "message-1"));
+		assert.equal(summaryCharged, false);
+
+		let missingPromptCharged = false;
+		const missingPromptService = messageService(
+			database({
+				target: async () => ({
+					role: "ASSISTANT",
+					type: "RESULT",
+					createdAt: new Date("2026-01-01"),
+					attachments: [],
+				}),
+				priorPrompt: async () => null,
+			}),
+			async () => {
+				missingPromptCharged = true;
+			},
+		);
+		await assert.rejects(() => missingPromptService.retry("user-1", "project-1", "message-1"));
+		assert.equal(missingPromptCharged, false);
 	});
 });

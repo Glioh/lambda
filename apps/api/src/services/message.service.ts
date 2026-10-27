@@ -21,10 +21,10 @@ export function messageService(
 		},
 
 		async create(userId: string, projectId: string, input: MessageInput, isPro = false) {
-			await chargeCredits(userId, isPro);
 			await requireProject(userId, projectId);
 
 			const attachments = validateMessageAttachments(input);
+			await chargeCredits(userId, isPro);
 
 			return database.transaction(async ({ messages, projects }) => {
 				const message = await messages.create(projectId, input.value, attachments);
@@ -34,7 +34,6 @@ export function messageService(
 		},
 
 		async edit(userId: string, projectId: string, messageId: string, input: string, isPro = false) {
-			await chargeCredits(userId, isPro);
 			await requireProject(userId, projectId);
 
 			return database.transaction(async ({ messages, projects }) => {
@@ -50,6 +49,7 @@ export function messageService(
 					throw new ApplicationError("INVALID_INPUT", "Message cannot be empty.");
 				}
 
+				await chargeCredits(userId, isPro);
 				await messages.edit(target.id, value);
 				await messages.deleteMessagesFrom(projectId, target.createdAt, { inclusive: false });
 				await projects.touch(projectId, new Date());
@@ -59,7 +59,6 @@ export function messageService(
 		},
 
 		async retry(userId: string, projectId: string, messageId: string, isPro = false) {
-			await chargeCredits(userId, isPro);
 			await requireProject(userId, projectId);
 
 			return database.transaction(async ({ messages, projects }) => {
@@ -80,6 +79,7 @@ export function messageService(
 					throw new ApplicationError("INVALID_INPUT", "Nothing to retry.");
 				}
 
+				await chargeCredits(userId, isPro);
 				await messages.deleteMessagesFrom(projectId, target.createdAt, {
 					inclusive: target.role !== "USER", // Delete if the message being retried belongs to agent
 				});
